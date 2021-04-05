@@ -8,11 +8,14 @@
 #include "stm32f4xx_hal.h"
 #include "gcode.h"
 #include "main.h"
+#include "app_msg.h"
 
 #define IS_NUMBER(x)					((x >= '0') && (x <= '9'))
 #define DECIMAL_DIGIT_LIMIT				10000
 
-char gcode_buff[GCODE_MAX_BUFFER_SIZE];
+ring_buffer_t gcode_buff = {0};
+const char ack_resp[] = "ok";
+cmd_block_t cmd_box = {0};
 
 const cmd_lut_t cmd_lut[CMD_INVALID] =
 {
@@ -23,8 +26,14 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"G4",			CMD_G4}
 };
 
+void gcode_receive(void);
+uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
+gcode_cmd_en search_cmd(char * str);
+int8_t param_extract(char* letter, float* fval, char* str);
+int8_t gcode_parser(char *line, cmd_block_t* cmd_block);
+
 /* split line to string by delimeter */
-uint8_t split_line(char* list, uint8_t max, char* line, const char *delimeter)
+uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter)
 {
     uint8_t count = 0;
     char* rec = NULL;
@@ -48,7 +57,7 @@ gcode_cmd_en search_cmd(char * str)
 
 	for (i = 0; i < CMD_INVALID; i++)
 	{
-		if (0==pf_strcmp(cmd_lut[i].string, (char*)str))
+		if (0==strcmp(cmd_lut[i].string, (char*)str))
 		{
 			ret = cmd_lut[i].cmdid;
 			break;
@@ -63,7 +72,7 @@ int8_t param_extract(char* letter, float* fval, char* str)
 {
 	uint16_t pointer = 0;
 	int8_t	sign_value = 1;
-	uint32_t decimal_factor = 0;
+	float decimal_factor = 0;
 	uint8_t num;
 	char ch;
 	uint32_t lu32val = 0;
@@ -127,7 +136,7 @@ int8_t param_extract(char* letter, float* fval, char* str)
 		else
 		{
 			/* return fail on abnormal character */
-			return -1;
+			break;
 		}
 	}
 
@@ -143,21 +152,22 @@ int8_t param_extract(char* letter, float* fval, char* str)
 
 int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
 {
-    char *cmd_arg [CMD_MAX_ITEM];
+    char* cmd_arg[CMD_MAX_ITEM];
     uint8_t cmd_arg_count = 0;
     uint8_t i;
     char letter = 0;
+    char delimeter = ' ';
     float fval = 0;
     int8_t ret;
 
-    cmd_arg_count = split_line(cmd_arg, CMD_MAX_ITEM, line, ' ');
+    cmd_arg_count = split_line(cmd_arg, CMD_MAX_ITEM, line, &delimeter);
 
     if (cmd_arg_count == 0)
     {
     	return -1;
     }
 
-    cmd_block->cmdid = search_cmd(&cmd_arg[0]);
+    cmd_block->cmdid = search_cmd(cmd_arg[0]);
 
     if (cmd_block->cmdid == CMD_INVALID)
     {
@@ -166,7 +176,7 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
 
     for (i = 1; i < cmd_arg_count; i++)
     {
-    	ret = param_extract(&letter, &fval, &cmd_arg[i]);
+    	ret = param_extract(&letter, &fval, cmd_arg[i]);
     	if (ret != 0)
     	{
     		return -1;
@@ -203,25 +213,28 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
     return 0;
 }
 
-void gcode_rcv_cplt_cb(UART_HandleTypeDef *huart)
-{
-
-}
 
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)
 {
+	msg_t msg = {0};
 
+	gcode_buff.item[gcode_buff.wptr].actsize = Pos;
+	/* notify gcode task */
+	msg.msgid = GCODE_UART_RCV_NOTIF;
+	osMessageQueuePut(uart_queueHandle, &msg, 0, 0);
 }
 
 void gcode_button_press(void)
 {
-	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff, GCODE_MAX_BUFFER_SIZE);
+
 }
 
 void gcode_task(void)
 {
 	msg_t msg = {0};
 	osStatus_t ret;
+
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
 
 	while(1)
 	{
@@ -234,14 +247,37 @@ void gcode_task(void)
 		{
 			switch (msg.msgid)
 			{
-			case FPGA__STATUS_CHANGE_MSG:
+			case GCODE_UART_RCV_NOTIF:
+				/* add '\0' to make a complete string */
+				gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize] = 0;
+				gcode_buff.load_cnt++;
+				gcode_buff.wptr = (gcode_buff.wptr + 1) % GCODE_MAX_BUFF_ITEM;
+				gcode_receive();
+
+				while (gcode_buff.load_cnt > 0)
+				{
+					gcode_parser((char*)gcode_buff.item[gcode_buff.rptr].data, &cmd_box);
+					gcode_buff.load_cnt--;
+					gcode_buff.rptr = (gcode_buff.rptr + 1) % GCODE_MAX_BUFF_ITEM;
+				}
 
 				break;
 
 			default:
 				break;
 			}
+
+			/*state machine execute */
 		}
+
 	}
 }
 
+void gcode_receive(void)
+{
+	if (gcode_buff.load_cnt < GCODE_MAX_BUFF_ITEM)
+	{
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
+		HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
+	}
+}

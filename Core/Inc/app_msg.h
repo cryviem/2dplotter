@@ -3,6 +3,7 @@
 
 typedef enum {
 	FPGA__STATUS_CHANGE_MSG,
+	GCODE_UART_RCV_NOTIF,
 	NUM_OF_MSG
 } msg_id_en;
 

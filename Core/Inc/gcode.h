@@ -9,7 +9,8 @@
 #define INC_GCODE_H_
 
 #define CMD_MAX_ITEM				5
-#define GCODE_MAX_BUFFER_SIZE		100
+#define GCODE_MAX_ITEM_SIZE			100
+#define GCODE_MAX_BUFF_ITEM			4
 
 typedef enum
 {
@@ -37,7 +38,19 @@ typedef struct{
 
 }cmd_block_t;
 
-void gcode_rcv_cplt_cb(UART_HandleTypeDef *huart);
+typedef struct {
+	uint8_t											data[GCODE_MAX_ITEM_SIZE];
+	uint16_t 										actsize;
+} item_t;
+
+typedef struct {
+	item_t 											item[GCODE_MAX_BUFF_ITEM];
+	uint8_t 										wptr;
+	uint8_t 										rptr;
+	uint8_t											load_cnt;
+} ring_buffer_t;
+
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos);
 void gcode_button_press(void);
+void gcode_task(void);
 #endif /* INC_GCODE_H_ */

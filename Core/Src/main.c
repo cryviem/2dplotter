@@ -20,6 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "fpga.h"
@@ -155,10 +156,10 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of spi_queue */
-  spi_queueHandle = osMessageQueueNew (4, 12, &spi_queue_attributes);
+  spi_queueHandle = osMessageQueueNew (4, 16, &spi_queue_attributes);
 
   /* creation of uart_queue */
-  uart_queueHandle = osMessageQueueNew (4, 50, &uart_queue_attributes);
+  uart_queueHandle = osMessageQueueNew (4, 8, &uart_queue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -306,7 +307,6 @@ static void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-  huart1.RxCpltCallback = gcode_rcv_cplt_cb;
   huart1.RxEventCallback = gcode_rcv_event_cb;
   /* USER CODE END USART1_Init 2 */
 
