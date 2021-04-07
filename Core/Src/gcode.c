@@ -13,10 +13,8 @@
 #define IS_NUMBER(x)					((x >= '0') && (x <= '9'))
 #define DECIMAL_DIGIT_LIMIT				4
 
-ring_buffer_t gcode_buff = {0};
-const char ack_resp[] = "ok";
-cmd_block_t cmd_box = {0};
 
+const char ack_resp[] = "ok";
 const cmd_lut_t cmd_lut[CMD_INVALID] =
 {
 		{"G0",			CMD_G0},
@@ -25,14 +23,20 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"G3",			CMD_G3},
 		{"G4",			CMD_G4}
 };
-
 const float decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 0.1, 0.01, 0.001, 0.0001};
+
+ring_buffer_t gcode_buff = {0};
+cmd_block_t cmd_box = {0};
+gcode_state_en gcode_state = STATE_IDLE;
+
 
 void gcode_receive(void);
 uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
 gcode_cmd_en search_cmd(char * str);
 int8_t param_extract(char* letter, float* fval, char* str);
 int8_t gcode_parser(char *line, cmd_block_t* cmd_block);
+void gcode_send_empty_msg(msg_id_en msgid);
+uint8_t able_to_work(void);
 
 /* split line to string by delimeter */
 uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter)
@@ -207,17 +211,21 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
 
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)
 {
-	msg_t msg = {0};
-
 	gcode_buff.item[gcode_buff.wptr].actsize = Pos;
 	/* notify gcode task */
-	msg.msgid = GCODE_UART_RCV_NOTIF;
-	osMessageQueuePut(uart_queueHandle, &msg, 0, 0);
+	gcode_send_empty_msg(GCODE_UART_RCV_NOTIF);
 }
 
 void gcode_button_press(void)
 {
 
+}
+
+void gcode_send_empty_msg(msg_id_en msgid)
+{
+	msg_t msg = {0};
+	msg.msgid = msgid;
+	osMessageQueuePut(uart_queueHandle, &msg, 0, 0);
 }
 
 void gcode_task(void)
@@ -245,13 +253,26 @@ void gcode_task(void)
 				gcode_buff.wptr = (gcode_buff.wptr + 1) % GCODE_MAX_BUFF_ITEM;
 				gcode_receive();
 
-				while (gcode_buff.load_cnt > 0)
+				if ((STATE_IDLE == gcode_state) && able_to_work())
 				{
-					gcode_parser((char*)gcode_buff.item[gcode_buff.rptr].data, &cmd_box);
-					gcode_buff.load_cnt--;
-					gcode_buff.rptr = (gcode_buff.rptr + 1) % GCODE_MAX_BUFF_ITEM;
+					gcode_state = STATE_EXECUTING;
+					gcode_send_empty_msg(GCODE_EXECUTE_CMD);
 				}
 
+				break;
+
+			case GCODE_EXECUTE_CMD:
+				gcode_parser((char*)gcode_buff.item[gcode_buff.rptr].data, &cmd_box);
+				gcode_buff.load_cnt--;
+				gcode_buff.rptr = (gcode_buff.rptr + 1) % GCODE_MAX_BUFF_ITEM;
+				if (able_to_work())
+				{
+					gcode_send_empty_msg(GCODE_EXECUTE_CMD);
+				}
+				else
+				{
+					gcode_state = STATE_IDLE;
+				}
 				break;
 
 			default:
@@ -271,4 +292,9 @@ void gcode_receive(void)
 		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
 		HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
 	}
+}
+
+uint8_t able_to_work(void)
+{
+
 }

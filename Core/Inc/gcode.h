@@ -22,6 +22,12 @@ typedef enum
 	CMD_INVALID
 }gcode_cmd_en;
 
+typedef enum
+{
+	STATE_IDLE,
+	STATE_EXECUTING
+}gcode_state_en;
+
 typedef struct{
     char*      		string;
     gcode_cmd_en 	cmdid;
@@ -49,6 +55,7 @@ typedef struct {
 	uint8_t 										rptr;
 	uint8_t											load_cnt;
 } ring_buffer_t;
+
 
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos);
 void gcode_button_press(void);

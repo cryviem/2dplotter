@@ -7,7 +7,7 @@
 
 #ifndef SRC_PLANNER_H_
 #define SRC_PLANNER_H_
-
+#include "stm32f4xx_hal.h"
 /* PLANNER DEFAULT PARAMETERS */
 #define PLANNER_DEFAULT_FEEDRATE					20		/* mm/s */
 #define PLANNER_DEFAULT_ACCELERATE					800		/* mm/s2 */
