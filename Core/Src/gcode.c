@@ -11,7 +11,7 @@
 #include "app_msg.h"
 
 #define IS_NUMBER(x)					((x >= '0') && (x <= '9'))
-#define DECIMAL_DIGIT_LIMIT				10000
+#define DECIMAL_DIGIT_LIMIT				4
 
 ring_buffer_t gcode_buff = {0};
 const char ack_resp[] = "ok";
@@ -25,6 +25,8 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"G3",			CMD_G3},
 		{"G4",			CMD_G4}
 };
+
+const float decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 0.1, 0.01, 0.001, 0.0001};
 
 void gcode_receive(void);
 uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
@@ -72,7 +74,8 @@ int8_t param_extract(char* letter, float* fval, char* str)
 {
 	uint16_t pointer = 0;
 	int8_t	sign_value = 1;
-	float decimal_factor = 0;
+	uint8_t decimal_cnt = 0;
+	uint8_t is_decimal = 0;
 	uint8_t num;
 	char ch;
 	uint32_t lu32val = 0;
@@ -110,42 +113,30 @@ int8_t param_extract(char* letter, float* fval, char* str)
 		if (IS_NUMBER(ch))
 		{
 			num = ch - '0';
-			if (decimal_factor == 0)
-			{
-				/*integer part*/
-				lu32val = (((lu32val << 2) + lu32val) << 1) + num;	//lu32val*10 + num
-			}
-			else if (decimal_factor <= DECIMAL_DIGIT_LIMIT)
-			{
-				/*decimal part*/
-				lfval += (float)num / decimal_factor;
-				decimal_factor *= 10;
-			}
-			else
-			{
-				/* break after E-4 */
+			lu32val = (((lu32val << 2) + lu32val) << 1) + num;	//lu32val*10 + num
+
+			if (is_decimal == 1)
+				decimal_cnt++;
+
+			if (decimal_cnt >= DECIMAL_DIGIT_LIMIT)
 				break;
-			}
 		}
 		else if (ch == '.')
 		{
 			/* decimal point */
-			lfval = lu32val;
-			decimal_factor = 10;
+			is_decimal = 1;
 		}
 		else
 		{
-			/* return fail on abnormal character */
+			/* stop on abnormal character */
 			break;
 		}
 	}
 
-	if (decimal_factor == 0)
-	{
-		/*only integer part*/
-		lfval = lu32val;
-	}
-
+	lfval = lu32val;
+	/* decimal apply */
+	lfval *= decimal_factor[decimal_cnt];
+	/* sign apply */
 	*fval = sign_value*lfval;
 	return 0;
 }
