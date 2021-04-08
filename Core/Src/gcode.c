@@ -8,6 +8,7 @@
 #include <string.h>
 #include "gcode.h"
 #include "main.h"
+#include "planner.h"
 
 #define IS_NUMBER(x)					((x >= '0') && (x <= '9'))
 #define DECIMAL_DIGIT_LIMIT				4
@@ -240,35 +241,29 @@ static bool able_to_work(void)
 
 static void cmd_execute(cmd_block_t* cmd_block)
 {
+	pos_t target_pos = {0, 0};
+	bool is_rapid = false;
+	bool is_ccw = false;
+	bool is_valid = false
+
+	/* feedrate update */
+	if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
+	{
+		pl_updspdmmpm(cmd_block->F);
+	}
 
 	switch (cmd_block->cmdid)
 	{
 	case CMD_G0:
-		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
-		{
-			planner_updspdmmpm(cmd_block->F);
-		}
-		break;
-
+		is_rapid = true;
 	case CMD_G1:
-		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
-		{
-			planner_updspdmmpm(cmd_block->F);
-		}
-		break;
 
-	case CMD_G2:
-		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
-		{
-			planner_updspdmmpm(cmd_block->F);
-		}
 		break;
 
 	case CMD_G3:
-		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
-		{
-			planner_updspdmmpm(cmd_block->F);
-		}
+		is_ccw = true;
+	case CMD_G2:
+
 		break;
 	}
 }

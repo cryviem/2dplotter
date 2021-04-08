@@ -12,12 +12,12 @@
 #define GCODE_MAX_ITEM_SIZE			100
 #define GCODE_MAX_BUFF_ITEM			4
 
-#define CMD_STATUS_X_BIT			(uint16)0x0001
-#define CMD_STATUS_Y_BIT			(uint16)0x0002
-#define CMD_STATUS_I_BIT			(uint16)0x0004
-#define CMD_STATUS_J_BIT			(uint16)0x0008
-#define CMD_STATUS_F_BIT			(uint16)0x0010
-#define CMD_STATUS_P_BIT			(uint16)0x0020
+#define CMD_STATUS_X_BIT			0x0001
+#define CMD_STATUS_Y_BIT			0x0002
+#define CMD_STATUS_I_BIT			0x0004
+#define CMD_STATUS_J_BIT			0x0008
+#define CMD_STATUS_F_BIT			0x0010
+#define CMD_STATUS_P_BIT			0x0020
 
 #define IS_FLAG_SET(value, flag)	((value & flag) == flag)
 

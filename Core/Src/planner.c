@@ -4,12 +4,12 @@
  *  Created on: Apr 7, 2021
  *      Author: hanguyen
  */
-
+#include "app_common.h"
 #include "planner.h"
 
 pl_data_t	pl_box = {0};
 
-void planner_init(void)
+void pl_init(void)
 {
 	pl_box.cur_pos.x = 0;
 	pl_box.cur_pos.y = 0;
@@ -19,7 +19,12 @@ void planner_init(void)
 	pl_box.state = PL_READY;
 }
 
-void planner_updspdmmpm(float mmpm)
+bool pl_is_absolute_coord(void)
+{
+	return (ABSOLUTE_POSITIONING == pl_box.pos_ref);
+}
+
+void pl_updspdmmpm(float mmpm)
 {
 	float tmp = mmpm / 60;
 	if (tmp < PLANNER_MIN_FEEDRATE)
@@ -29,3 +34,12 @@ void planner_updspdmmpm(float mmpm)
 	pl_box.feedrate = tmp;
 }
 
+void pl_line(pos_t tar_pos, bool is_rapid_move)
+{
+
+}
+
+void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
+{
+
+}

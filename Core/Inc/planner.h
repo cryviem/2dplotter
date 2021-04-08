@@ -8,8 +8,6 @@
 #ifndef PLANNER_H
 #define PLANNER_H
 
-#include "stm32f4xx_hal.h"
-
 #define PLANNER_MIN_FEEDRATE						5		/* mm/s */
 #define PLANNER_MAX_FEEDRATE						60		/* mm/s */
 /* PLANNER DEFAULT PARAMETERS */
@@ -37,4 +35,16 @@ typedef struct {
 	pl_state_en	state;
 } pl_data_t;
 
+typedef struct {
+	pos_t	cur_pos;		/* mm */
+	float	feedrate;		/* mm/s */
+	float	accel;			/* mm/s2 */
+	uint8_t	pos_ref;
+	pl_state_en	state;
+} block_t;
+
+void pl_updspdmmpm(float mmpm);
+bool pl_is_absolute_coord(void);
+void pl_line(pos_t tar_pos, bool is_rapid_move);
+void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw);
 #endif /* PLANNER_H */
