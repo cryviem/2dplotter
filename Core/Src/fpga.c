@@ -1,6 +1,7 @@
 #include "stm32f4xx_hal.h"
 #include "main.h"
-#include "app_msg.h"
+#include "fpga.h"
+
 
 extern SPI_HandleTypeDef hspi2;
 uint16_t txdata_db[4] = {0x8001, 0x8002, 0x8003, 0x8004};
@@ -18,7 +19,8 @@ void fpga_button_pressed(void)
 
 void fpga_transmit_task(void)
 {
-	msg_t msg = {0};
+	fpga_msg_t msg = {0};
+
 	osStatus_t ret;
 
 	while(1)

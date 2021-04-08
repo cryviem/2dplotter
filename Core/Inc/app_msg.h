@@ -1,5 +1,6 @@
 
-#define MSG_MAX_SIZE		24
+#ifndef APP_MSG_H
+#define APP_MSG_H
 
 typedef enum {
 	FPGA__STATUS_CHANGE_MSG,
@@ -8,17 +9,4 @@ typedef enum {
 	NUM_OF_MSG
 } msg_id_en;
 
-typedef enum {
-	FPGA_ILDE,
-	FPGA_BUSY
-} fpga_status_en;
-
-typedef union {
-	fpga_status_en			fpga_sts;
-	uint8_t					rawdata[MSG_MAX_SIZE];
-} os_msg_data_t;
-
-typedef struct {
-    msg_id_en               msgid;
-    os_msg_data_t           payload;
-} msg_t;
+#endif /* APP_MSG_H */

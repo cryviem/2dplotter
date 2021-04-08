@@ -4,11 +4,10 @@
  *  Created on: Mar 30, 2021
  *      Author: Admin
  */
+#include "app_common.h"
 #include <string.h>
-#include "stm32f4xx_hal.h"
 #include "gcode.h"
 #include "main.h"
-#include "app_msg.h"
 
 #define IS_NUMBER(x)					((x >= '0') && (x <= '9'))
 #define DECIMAL_DIGIT_LIMIT				4
@@ -30,16 +29,18 @@ cmd_block_t cmd_box = {0};
 gcode_state_en gcode_state = STATE_IDLE;
 
 
-void gcode_receive(void);
-uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
-gcode_cmd_en search_cmd(char * str);
-int8_t param_extract(char* letter, float* fval, char* str);
-int8_t gcode_parser(char *line, cmd_block_t* cmd_block);
-void gcode_send_empty_msg(msg_id_en msgid);
-uint8_t able_to_work(void);
+static void gcode_receive(void);
+static uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
+static gcode_cmd_en search_cmd(char * str);
+static int8_t param_extract(char* letter, float* fval, char* str);
+static int8_t cmd_parser(char *line, cmd_block_t* cmd_block);
+static bool able_to_work(void);
+static void cmd_execute(cmd_block_t* cmd_block);
+
+
 
 /* split line to string by delimeter */
-uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter)
+static uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter)
 {
     uint8_t count = 0;
     char* rec = NULL;
@@ -56,7 +57,7 @@ uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter)
 }
 
 /* search command from string */
-gcode_cmd_en search_cmd(char * str)
+static gcode_cmd_en search_cmd(char * str)
 {
 	gcode_cmd_en ret = CMD_INVALID;
 	uint8_t i;
@@ -74,7 +75,7 @@ gcode_cmd_en search_cmd(char * str)
 }
 
 /* extract letter and float values from string */
-int8_t param_extract(char* letter, float* fval, char* str)
+static int8_t param_extract(char* letter, float* fval, char* str)
 {
 	uint16_t pointer = 0;
 	int8_t	sign_value = 1;
@@ -145,7 +146,7 @@ int8_t param_extract(char* letter, float* fval, char* str)
 	return 0;
 }
 
-int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
+static int8_t cmd_parser(char *line, cmd_block_t* cmd_block)
 {
     char* cmd_arg[CMD_MAX_ITEM];
     uint8_t cmd_arg_count = 0;
@@ -181,26 +182,32 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
     	{
     	case 'X':
     		cmd_block->X = fval;
+    		cmd_block->flag |= CMD_STATUS_X_BIT;
     		break;
 
     	case 'Y':
     		cmd_block->Y = fval;
+    		cmd_block->flag |= CMD_STATUS_Y_BIT;
     		break;
 
     	case 'I':
     		cmd_block->I = fval;
+    		cmd_block->flag |= CMD_STATUS_I_BIT;
     		break;
 
     	case 'J':
     		cmd_block->J = fval;
+    		cmd_block->flag |= CMD_STATUS_J_BIT;
     		break;
 
     	case 'F':
     		cmd_block->F = fval;
+    		cmd_block->flag |= CMD_STATUS_F_BIT;
     		break;
 
     	case 'P':
     		cmd_block->P = fval;
+    		cmd_block->flag |= CMD_STATUS_P_BIT;
     		break;
     	}
     }
@@ -208,6 +215,63 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
     return 0;
 }
 
+static void gcode_receive(void)
+{
+	if (gcode_buff.load_cnt < GCODE_MAX_BUFF_ITEM)
+	{
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
+		HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
+	}
+}
+
+static bool able_to_work(void)
+{
+	/* check command buffer */
+	if (gcode_buff.load_cnt == 0)
+	{
+		return false;
+	}
+
+	// Add more condition here
+
+	/* final return is true */
+	return true;
+}
+
+static void cmd_execute(cmd_block_t* cmd_block)
+{
+
+	switch (cmd_block->cmdid)
+	{
+	case CMD_G0:
+		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
+		{
+			planner_updspdmmpm(cmd_block->F);
+		}
+		break;
+
+	case CMD_G1:
+		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
+		{
+			planner_updspdmmpm(cmd_block->F);
+		}
+		break;
+
+	case CMD_G2:
+		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
+		{
+			planner_updspdmmpm(cmd_block->F);
+		}
+		break;
+
+	case CMD_G3:
+		if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
+		{
+			planner_updspdmmpm(cmd_block->F);
+		}
+		break;
+	}
+}
 
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)
 {
@@ -223,14 +287,14 @@ void gcode_button_press(void)
 
 void gcode_send_empty_msg(msg_id_en msgid)
 {
-	msg_t msg = {0};
+	gcode_msg_t msg = {0};
 	msg.msgid = msgid;
 	osMessageQueuePut(uart_queueHandle, &msg, 0, 0);
 }
 
 void gcode_task(void)
 {
-	msg_t msg = {0};
+	gcode_msg_t msg = {0};
 	osStatus_t ret;
 
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
@@ -253,7 +317,7 @@ void gcode_task(void)
 				gcode_buff.wptr = (gcode_buff.wptr + 1) % GCODE_MAX_BUFF_ITEM;
 				gcode_receive();
 
-				if ((STATE_IDLE == gcode_state) && able_to_work())
+				if ((STATE_IDLE == gcode_state) && (true == able_to_work()))
 				{
 					gcode_state = STATE_EXECUTING;
 					gcode_send_empty_msg(GCODE_EXECUTE_CMD);
@@ -262,10 +326,12 @@ void gcode_task(void)
 				break;
 
 			case GCODE_EXECUTE_CMD:
-				gcode_parser((char*)gcode_buff.item[gcode_buff.rptr].data, &cmd_box);
+				memset(&cmd_box, 0, sizeof(cmd_block_t));
+				cmd_parser((char*)gcode_buff.item[gcode_buff.rptr].data, &cmd_box);
+				cmd_execute(&cmd_box);
 				gcode_buff.load_cnt--;
 				gcode_buff.rptr = (gcode_buff.rptr + 1) % GCODE_MAX_BUFF_ITEM;
-				if (able_to_work())
+				if (true == able_to_work())
 				{
 					gcode_send_empty_msg(GCODE_EXECUTE_CMD);
 				}
@@ -285,16 +351,4 @@ void gcode_task(void)
 	}
 }
 
-void gcode_receive(void)
-{
-	if (gcode_buff.load_cnt < GCODE_MAX_BUFF_ITEM)
-	{
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
-		HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
-	}
-}
 
-uint8_t able_to_work(void)
-{
-
-}

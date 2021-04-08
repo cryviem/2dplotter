@@ -5,9 +5,13 @@
  *      Author: hanguyen
  */
 
-#ifndef SRC_PLANNER_H_
-#define SRC_PLANNER_H_
+#ifndef PLANNER_H
+#define PLANNER_H
+
 #include "stm32f4xx_hal.h"
+
+#define PLANNER_MIN_FEEDRATE						5		/* mm/s */
+#define PLANNER_MAX_FEEDRATE						60		/* mm/s */
 /* PLANNER DEFAULT PARAMETERS */
 #define PLANNER_DEFAULT_FEEDRATE					20		/* mm/s */
 #define PLANNER_DEFAULT_ACCELERATE					800		/* mm/s2 */
@@ -33,4 +37,4 @@ typedef struct {
 	pl_state_en	state;
 } pl_data_t;
 
-#endif /* SRC_PLANNER_H_ */
+#endif /* PLANNER_H */

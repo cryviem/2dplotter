@@ -5,12 +5,21 @@
  *      Author: Admin
  */
 
-#ifndef INC_GCODE_H_
-#define INC_GCODE_H_
+#ifndef GCODE_H
+#define GCODE_H
 
 #define CMD_MAX_ITEM				5
 #define GCODE_MAX_ITEM_SIZE			100
 #define GCODE_MAX_BUFF_ITEM			4
+
+#define CMD_STATUS_X_BIT			(uint16)0x0001
+#define CMD_STATUS_Y_BIT			(uint16)0x0002
+#define CMD_STATUS_I_BIT			(uint16)0x0004
+#define CMD_STATUS_J_BIT			(uint16)0x0008
+#define CMD_STATUS_F_BIT			(uint16)0x0010
+#define CMD_STATUS_P_BIT			(uint16)0x0020
+
+#define IS_FLAG_SET(value, flag)	((value & flag) == flag)
 
 typedef enum
 {
@@ -41,7 +50,7 @@ typedef struct{
     float			J;
     float			F;
     float			P;
-
+    uint16_t		flag;
 }cmd_block_t;
 
 typedef struct {
@@ -56,8 +65,13 @@ typedef struct {
 	uint8_t											load_cnt;
 } ring_buffer_t;
 
+typedef struct {
+    msg_id_en               msgid;
+    uint8_t           		payload[4];
+} gcode_msg_t;
 
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos);
 void gcode_button_press(void);
+void gcode_send_empty_msg(msg_id_en msgid);
 void gcode_task(void);
-#endif /* INC_GCODE_H_ */
+#endif /* GCODE_H */
