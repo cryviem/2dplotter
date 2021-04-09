@@ -25,12 +25,12 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 };
 const float decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 0.1, 0.01, 0.001, 0.0001};
 
-ring_buffer_t gcode_buff = {0};
+gcode_buffer_t gcode_buff = {0};
 cmd_block_t cmd_box = {0};
 gcode_state_en gcode_state = STATE_IDLE;
 
 
-static void gcode_receive(void);
+
 static uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
 static gcode_cmd_en search_cmd(char * str);
 static int8_t param_extract(char* letter, float* fval, char* str);
@@ -216,14 +216,7 @@ static int8_t cmd_parser(char *line, cmd_block_t* cmd_block)
     return 0;
 }
 
-static void gcode_receive(void)
-{
-	if (gcode_buff.load_cnt < GCODE_MAX_BUFF_ITEM)
-	{
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
-		HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
-	}
-}
+
 
 static bool able_to_work(void)
 {
@@ -268,82 +261,47 @@ static void cmd_execute(cmd_block_t* cmd_block)
 	}
 }
 
+bool gcode_receive(void)
+{
+	bool ret = false;
+	if (gcode_buff.load_cnt < GCODE_MAX_BUFF_ITEM)
+	{
+		ret = (HAL_OK == HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE));
+	}
+	return ret;
+}
+
+void gcode_send_ok(void)
+{
+	HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
+}
+
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)
 {
+	msg_t msg = {0};
 	gcode_buff.item[gcode_buff.wptr].actsize = Pos;
-	/* notify gcode task */
-	gcode_send_empty_msg(GCODE_UART_RCV_NOTIF);
+	msg.msgid = GCODE_CMD_RCV_NOTIF_MSG;
+	osMessageQueuePut(plotter_queueHandle, &msg,0,0);
 }
 
-void gcode_button_press(void)
+void gcode_wr_buff_cmplt(void)
 {
-
+	/* add '\0' to make a complete string */
+	gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize] = 0;
+	gcode_buff.load_cnt++;
+	gcode_buff.wptr = (gcode_buff.wptr + 1) % GCODE_MAX_BUFF_ITEM;
 }
 
-void gcode_send_empty_msg(msg_id_en msgid)
+uint8_t* gcode_rd_buff(void)
 {
-	gcode_msg_t msg = {0};
-	msg.msgid = msgid;
-	osMessageQueuePut(uart_queueHandle, &msg, 0, 0);
-}
+	uint8_t* ret = NULL;
 
-void gcode_task(void)
-{
-	gcode_msg_t msg = {0};
-	osStatus_t ret;
-
-	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, (uint8_t*)gcode_buff.item[gcode_buff.wptr].data, GCODE_MAX_ITEM_SIZE);
-
-	while(1)
+	if (gcode_buff.load_cnt > 0)
 	{
-		ret = osMessageQueueGet(uart_queueHandle, &msg, (void*)0, 5000 );
-		if (osOK != ret)
-		{
-			/**/
-		}
-		else
-		{
-			switch (msg.msgid)
-			{
-			case GCODE_UART_RCV_NOTIF:
-				/* add '\0' to make a complete string */
-				gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize] = 0;
-				gcode_buff.load_cnt++;
-				gcode_buff.wptr = (gcode_buff.wptr + 1) % GCODE_MAX_BUFF_ITEM;
-				gcode_receive();
-
-				if ((STATE_IDLE == gcode_state) && (true == able_to_work()))
-				{
-					gcode_state = STATE_EXECUTING;
-					gcode_send_empty_msg(GCODE_EXECUTE_CMD);
-				}
-
-				break;
-
-			case GCODE_EXECUTE_CMD:
-				memset(&cmd_box, 0, sizeof(cmd_block_t));
-				cmd_parser((char*)gcode_buff.item[gcode_buff.rptr].data, &cmd_box);
-				cmd_execute(&cmd_box);
-				gcode_buff.load_cnt--;
-				gcode_buff.rptr = (gcode_buff.rptr + 1) % GCODE_MAX_BUFF_ITEM;
-				if (true == able_to_work())
-				{
-					gcode_send_empty_msg(GCODE_EXECUTE_CMD);
-				}
-				else
-				{
-					gcode_state = STATE_IDLE;
-				}
-				break;
-
-			default:
-				break;
-			}
-
-			/*state machine execute */
-		}
-
+		ret = gcode_buff.item[gcode_buff.rptr].data;
+		gcode_buff.load_cnt--;
+		gcode_buff.rptr = (gcode_buff.rptr + 1) % GCODE_MAX_BUFF_ITEM;
 	}
+
+	return ret;
 }
-
-

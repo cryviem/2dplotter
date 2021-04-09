@@ -63,15 +63,11 @@ typedef struct {
 	uint8_t 										wptr;
 	uint8_t 										rptr;
 	uint8_t											load_cnt;
-} ring_buffer_t;
+} gcode_buffer_t;
 
-typedef struct {
-    msg_id_en               msgid;
-    uint8_t           		payload[4];
-} gcode_msg_t;
-
+bool gcode_receive(void);
+void gcode_send_ok(void);
+void gcode_wr_buff_cmplt(void);
+uint8_t* gcode_rd_buff(void);
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos);
-void gcode_button_press(void);
-void gcode_send_empty_msg(msg_id_en msgid);
-void gcode_task(void);
 #endif /* GCODE_H */

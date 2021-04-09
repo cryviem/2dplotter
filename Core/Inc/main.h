@@ -39,8 +39,7 @@ extern "C" {
 /* USER CODE BEGIN ET */
 extern SPI_HandleTypeDef hspi2;
 extern UART_HandleTypeDef huart1;
-extern osMessageQueueId_t spi_queueHandle;
-extern osMessageQueueId_t uart_queueHandle;
+extern osMessageQueueId_t plotter_queueHandle;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

@@ -19,12 +19,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "fpga.h"
-#include "gcode.h"
+#include "plotter.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,19 +49,12 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 
-/* Definitions for spi_job */
-osThreadId_t spi_jobHandle;
-const osThreadAttr_t spi_job_attributes = {
-  .name = "spi_job",
-  .stack_size = 128 * 4,
+/* Definitions for plotter */
+osThreadId_t plotterHandle;
+const osThreadAttr_t plotter_attributes = {
+  .name = "plotter",
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for uart_job */
-osThreadId_t uart_jobHandle;
-const osThreadAttr_t uart_job_attributes = {
-  .name = "uart_job",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for mics_job */
 osThreadId_t mics_jobHandle;
@@ -71,15 +63,10 @@ const osThreadAttr_t mics_job_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
-/* Definitions for spi_queue */
-osMessageQueueId_t spi_queueHandle;
-const osMessageQueueAttr_t spi_queue_attributes = {
-  .name = "spi_queue"
-};
-/* Definitions for uart_queue */
-osMessageQueueId_t uart_queueHandle;
-const osMessageQueueAttr_t uart_queue_attributes = {
-  .name = "uart_queue"
+/* Definitions for plotter_queue */
+osMessageQueueId_t plotter_queueHandle;
+const osMessageQueueAttr_t plotter_queue_attributes = {
+  .name = "plotter_queue"
 };
 /* USER CODE BEGIN PV */
 
@@ -91,8 +78,7 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
-void spi_task(void *argument);
-void uart_task(void *argument);
+void plotter_task(void *argument);
 void periodic_task(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -155,22 +141,16 @@ int main(void)
   /* USER CODE END RTOS_TIMERS */
 
   /* Create the queue(s) */
-  /* creation of spi_queue */
-  spi_queueHandle = osMessageQueueNew (4, 16, &spi_queue_attributes);
-
-  /* creation of uart_queue */
-  uart_queueHandle = osMessageQueueNew (4, 8, &uart_queue_attributes);
+  /* creation of plotter_queue */
+  plotter_queueHandle = osMessageQueueNew (10, 8, &plotter_queue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of spi_job */
-  spi_jobHandle = osThreadNew(spi_task, NULL, &spi_job_attributes);
-
-  /* creation of uart_job */
-  uart_jobHandle = osThreadNew(uart_task, NULL, &uart_job_attributes);
+  /* creation of plotter */
+  plotterHandle = osThreadNew(plotter_task, NULL, &plotter_attributes);
 
   /* creation of mics_job */
   mics_jobHandle = osThreadNew(periodic_task, NULL, &mics_job_attributes);
@@ -392,33 +372,18 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_spi_task */
+/* USER CODE BEGIN Header_plotter_task */
 /**
-  * @brief  Function implementing the spi_job thread.
+  * @brief  Function implementing the plotter thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_spi_task */
-void spi_task(void *argument)
+/* USER CODE END Header_plotter_task */
+void plotter_task(void *argument)
 {
   /* USER CODE BEGIN 5 */
-	fpga_transmit_task();
+	plotter_main();
   /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_uart_task */
-/**
-* @brief Function implementing the uart_job thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_uart_task */
-void uart_task(void *argument)
-{
-  /* USER CODE BEGIN uart_task */
-  /* Infinite loop */
-	gcode_task();
-  /* USER CODE END uart_task */
 }
 
 /* USER CODE BEGIN Header_periodic_task */
