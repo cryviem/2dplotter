@@ -9,6 +9,7 @@
 #include "gcode.h"
 #include "main.h"
 #include "planner.h"
+#include "plotter.h"
 
 #define IS_NUMBER(x)					((x >= '0') && (x <= '9'))
 #define DECIMAL_DIGIT_LIMIT				4
@@ -34,9 +35,6 @@ gcode_state_en gcode_state = STATE_IDLE;
 static uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
 static gcode_cmd_en search_cmd(char * str);
 static int8_t param_extract(char* letter, float* fval, char* str);
-static int8_t cmd_parser(char *line, cmd_block_t* cmd_block);
-static bool able_to_work(void);
-static void cmd_execute(cmd_block_t* cmd_block);
 
 
 
@@ -147,7 +145,7 @@ static int8_t param_extract(char* letter, float* fval, char* str)
 	return 0;
 }
 
-static int8_t cmd_parser(char *line, cmd_block_t* cmd_block)
+int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
 {
     char* cmd_arg[CMD_MAX_ITEM];
     uint8_t cmd_arg_count = 0;
@@ -216,51 +214,6 @@ static int8_t cmd_parser(char *line, cmd_block_t* cmd_block)
     return 0;
 }
 
-
-
-static bool able_to_work(void)
-{
-	/* check command buffer */
-	if (gcode_buff.load_cnt == 0)
-	{
-		return false;
-	}
-
-	// Add more condition here
-
-	/* final return is true */
-	return true;
-}
-
-static void cmd_execute(cmd_block_t* cmd_block)
-{
-	pos_t target_pos = {0, 0};
-	bool is_rapid = false;
-	bool is_ccw = false;
-	bool is_valid = false
-
-	/* feedrate update */
-	if (IS_FLAG_SET(cmd_block->flag, CMD_STATUS_F_BIT))
-	{
-		pl_updspdmmpm(cmd_block->F);
-	}
-
-	switch (cmd_block->cmdid)
-	{
-	case CMD_G0:
-		is_rapid = true;
-	case CMD_G1:
-
-		break;
-
-	case CMD_G3:
-		is_ccw = true;
-	case CMD_G2:
-
-		break;
-	}
-}
-
 bool gcode_receive(void)
 {
 	bool ret = false;
@@ -304,4 +257,73 @@ uint8_t* gcode_rd_buff(void)
 	}
 
 	return ret;
+}
+
+uint8_t gcode_get_loaded(void)
+{
+	return gcode_buff.load_cnt;
+}
+
+void gcode_execute(cmd_block_t cmd_block)
+{
+	pos_t target_pos = {0, 0};
+	pos_t center_pos = {0, 0};
+	bool is_rapid = false;
+	bool is_ccw = false;
+	bool is_valid = false;
+
+	/* feedrate update */
+	if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_F_BIT))
+	{
+		pl_updspdmmpm(cmd_block.F);
+	}
+
+	switch (cmd_block.cmdid)
+	{
+	case CMD_G0:
+		is_rapid = true;
+	case CMD_G1:
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
+		{
+			target_pos.x = pl_calc_dx(cmd_block.X);
+			is_valid = true;
+		}
+
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_Y_BIT))
+		{
+			target_pos.y = pl_calc_dy(cmd_block.Y);
+			is_valid = true;
+		}
+
+		if (true == is_valid)
+		{
+			pl_line(target_pos, is_rapid);
+		}
+		break;
+
+	case CMD_G3:
+		is_ccw = true;
+	case CMD_G2:
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
+		{
+			target_pos.x = pl_calc_dx(cmd_block.X);
+			is_valid = true;
+		}
+
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_Y_BIT))
+		{
+			target_pos.y = pl_calc_dy(cmd_block.Y);
+			is_valid = true;
+		}
+
+		if ((true == is_valid) && (IS_FLAG_SET(cmd_block.flag, (CMD_STATUS_I_BIT | CMD_STATUS_J_BIT))))
+		{
+			center_pos.x = cmd_block.I;
+			center_pos.y = cmd_block.J;
+			pl_arc(target_pos, center_pos, is_ccw);
+		}
+		break;
+	default:
+		break;
+	}
 }

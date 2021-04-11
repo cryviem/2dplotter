@@ -45,6 +45,8 @@ typedef struct {
 
 void pl_updspdmmpm(float mmpm);
 bool pl_is_absolute_coord(void);
+float pl_calc_dx(float x);
+float pl_calc_dy(float y);
 void pl_line(pos_t tar_pos, bool is_rapid_move);
 void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw);
 #endif /* PLANNER_H */

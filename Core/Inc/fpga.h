@@ -1,7 +1,7 @@
 
 #ifndef FPGA_H
 #define FPGA_H
-
+#include "app_common.h"
 typedef enum {
 	FPGA_STATUS_READY,
 	FPGA_STATUS_BUSY

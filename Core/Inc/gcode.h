@@ -68,6 +68,9 @@ typedef struct {
 bool gcode_receive(void);
 void gcode_send_ok(void);
 void gcode_wr_buff_cmplt(void);
+uint8_t gcode_get_loaded(void);
 uint8_t* gcode_rd_buff(void);
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos);
+int8_t gcode_parser(char *line, cmd_block_t* cmd_block);
+void gcode_execute(cmd_block_t cmd_block);
 #endif /* GCODE_H */

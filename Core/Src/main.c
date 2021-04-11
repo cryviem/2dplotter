@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "plotter.h"
+#include "gcode.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -414,8 +415,6 @@ void periodic_task(void *argument)
 		if (eventcnt > BUTTON_FILTERTIME)
 		{
 			/* button pressed detected */
-			//fpga_button_pressed();
-			gcode_button_press();
 			eventcnt = 0;
 		}
 	}

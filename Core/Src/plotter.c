@@ -9,6 +9,10 @@
 #include "main.h"
 #include "planner.h"
 #include "gcode.h"
+#include "plotter.h"
+
+static bool precond_check(void);
+static void plotter_work(void);
 
 void plotter_main(void)
 {
@@ -36,23 +40,7 @@ void plotter_main(void)
 					gcode_send_ok();
 
 				// call command execute
-
-				break;
-
-			case GCODE_CMD_EXECUTE_MSG:
-				memset(&cmd_box, 0, sizeof(cmd_block_t));
-				cmd_parser((char*)gcode_buff.item[gcode_buff.rptr].data, &cmd_box);
-				cmd_execute(&cmd_box);
-				gcode_buff.load_cnt--;
-				gcode_buff.rptr = (gcode_buff.rptr + 1) % GCODE_MAX_BUFF_ITEM;
-				if (true == able_to_work())
-				{
-					gcode_send_empty_msg(GCODE_EXECUTE_CMD);
-				}
-				else
-				{
-					gcode_state = STATE_IDLE;
-				}
+				plotter_work();
 				break;
 
 			case FPGA_STATUS_CHANGE_MSG:
@@ -70,3 +58,32 @@ void plotter_main(void)
 	}
 }
 
+static void plotter_work(void)
+{
+	uint8_t* line = NULL;
+	cmd_block_t cmd_block;
+
+	while (precond_check())
+	{
+		line = gcode_rd_buff();
+		memset(&cmd_block, 0, sizeof(cmd_block_t));
+		if (0 != gcode_parser((char*)line, &cmd_block))
+			continue;	/* ignore the below if cmd parse fail*/
+
+		gcode_execute(cmd_block);
+	}
+}
+
+static bool precond_check(void)
+{
+	bool ret = true;
+
+	/* check if pending gcode command in buffer */
+	if (gcode_get_loaded() == 0)
+	{
+		ret = false;
+	}
+
+	/* add more condition later */
+	return ret;
+}

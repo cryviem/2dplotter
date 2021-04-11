@@ -43,3 +43,36 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 {
 
 }
+
+float pl_calc_dx(float x)
+{
+	float ret = 0;
+
+	if (true == pl_is_absolute_coord())
+	{
+		ret = x - pl_box.cur_pos.x;
+	}
+	else
+	{
+		ret = x;
+	}
+
+	return ret;
+}
+
+float pl_calc_dy(float y)
+{
+	float ret = 0;
+
+	if (true == pl_is_absolute_coord())
+	{
+		ret = y - pl_box.cur_pos.y;
+	}
+	else
+	{
+		ret = y;
+	}
+
+	return ret;
+}
+

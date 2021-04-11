@@ -9,7 +9,6 @@
 #define APP_COMMON_H
 
 #include "stm32f4xx_hal.h"
-#include "app_msg.h"
 #include <stdbool.h>
 
 #endif /* APP_COMMON_H */
