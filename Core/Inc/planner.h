@@ -8,18 +8,18 @@
 #ifndef PLANNER_H
 #define PLANNER_H
 
-#define PLANNER_MIN_FEEDRATE						5		/* mm/s */
-#define PLANNER_MAX_FEEDRATE						60		/* mm/s */
+#define PLANNER_MIN_FEEDRATE						400		/* pulse/s */
+#define PLANNER_MAX_FEEDRATE						5000	/* pulse/s */
 /* PLANNER DEFAULT PARAMETERS */
-#define PLANNER_DEFAULT_FEEDRATE					20		/* mm/s */
-#define PLANNER_DEFAULT_ACCELERATE					800		/* mm/s2 */
+#define PLANNER_DEFAULT_FEEDRATE					1500	/* pulse/s */
+#define PLANNER_DEFAULT_ACCELERATE					64000	/* pulse/s2 */
 
 #define ABSOLUTE_POSITIONING						0
 #define RELATIVE_POSITIONING						1
 
 typedef struct {
-	float	x;		/* mm */
-	float	y;		/* mm */
+	int16_t	x;		/* pulse */
+	int16_t	y;		/* pulse */
 } pos_t;
 
 typedef enum {
@@ -28,25 +28,21 @@ typedef enum {
 } pl_state_en;
 
 typedef struct {
-	pos_t	cur_pos;		/* mm */
-	float	feedrate;		/* mm/s */
-	float	accel;			/* mm/s2 */
-	uint8_t	pos_ref;
+	pos_t		cur_pos;		/* pulse */
+	uint16_t	feedrate;		/* pulse/s */
+	uint32_t	accel;			/* pulse/s2 */
+	uint8_t		pos_ref;
 	pl_state_en	state;
 } pl_data_t;
 
 typedef struct {
-	pos_t	cur_pos;		/* mm */
-	float	feedrate;		/* mm/s */
-	float	accel;			/* mm/s2 */
-	uint8_t	pos_ref;
-	pl_state_en	state;
+
 } block_t;
 
-void pl_updspdmmpm(float mmpm);
+void pl_updatespeed(uint16_t spd);
 bool pl_is_absolute_coord(void);
-float pl_calc_dx(float x);
-float pl_calc_dy(float y);
+int16_t pl_calc_dx(int16_t x);
+int16_t pl_calc_dy(int16_t y);
 void pl_line(pos_t tar_pos, bool is_rapid_move);
 void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw);
 #endif /* PLANNER_H */

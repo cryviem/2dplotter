@@ -8,6 +8,8 @@
 #ifndef GCODE_H
 #define GCODE_H
 
+#define MM_TO_PULSE					(uint32_t)80
+
 #define CMD_MAX_ITEM				5
 #define GCODE_MAX_ITEM_SIZE			100
 #define GCODE_MAX_BUFF_ITEM			4
@@ -44,12 +46,12 @@ typedef struct{
 
 typedef struct{
     gcode_cmd_en 	cmdid;
-    float			X;
-    float			Y;
-    float			I;
-    float			J;
-    float			F;
-    float			P;
+    int16_t			X;
+    int16_t			Y;
+    int16_t			I;
+    int16_t			J;
+    uint16_t		F;
+    uint16_t		P;
     uint16_t		flag;
 }cmd_block_t;
 

@@ -24,14 +24,14 @@ bool pl_is_absolute_coord(void)
 	return (ABSOLUTE_POSITIONING == pl_box.pos_ref);
 }
 
-void pl_updspdmmpm(float mmpm)
+void pl_updatespeed(uint16_t spd)
 {
-	float tmp = mmpm / 60;
-	if (tmp < PLANNER_MIN_FEEDRATE)
-		tmp = PLANNER_MIN_FEEDRATE;
-	if (tmp > PLANNER_MAX_FEEDRATE)
-		tmp = PLANNER_MAX_FEEDRATE;
-	pl_box.feedrate = tmp;
+	if (spd < PLANNER_MIN_FEEDRATE)
+		pl_box.feedrate = PLANNER_MIN_FEEDRATE;
+	else if (spd > PLANNER_MAX_FEEDRATE)
+		pl_box.feedrate = PLANNER_MAX_FEEDRATE;
+	else
+		pl_box.feedrate = spd;
 }
 
 void pl_line(pos_t tar_pos, bool is_rapid_move)
@@ -44,9 +44,9 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 
 }
 
-float pl_calc_dx(float x)
+int16_t pl_calc_dx(int16_t x)
 {
-	float ret = 0;
+	int16_t ret = 0;
 
 	if (true == pl_is_absolute_coord())
 	{
@@ -60,9 +60,9 @@ float pl_calc_dx(float x)
 	return ret;
 }
 
-float pl_calc_dy(float y)
+int16_t pl_calc_dy(int16_t y)
 {
-	float ret = 0;
+	int16_t ret = 0;
 
 	if (true == pl_is_absolute_coord())
 	{
