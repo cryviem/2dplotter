@@ -44,9 +44,16 @@ void plotter_main(void)
 				break;
 
 			case FPGA_STATUS_CHANGE_MSG:
+				if (true == fpga_send_ready())
+					fpga_send();
 				break;
 
 			case FPGA_SEND_CMPLT_MSG:
+				fpga_rd_buff_cmplt();
+
+				if (true == fpga_send_ready())
+					fpga_send();
+
 				break;
 			default:
 				break;
@@ -84,6 +91,11 @@ static bool precond_check(void)
 		ret = false;
 	}
 
+	/* check if able to add more item to fpga buffer */
+	if (false == fpga_wr_ready())
+	{
+		ret = false;
+	}
 	/* add more condition later */
 	return ret;
 }

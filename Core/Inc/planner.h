@@ -36,8 +36,18 @@ typedef struct {
 } pl_data_t;
 
 typedef struct {
-
-} block_t;
+	uint16_t	cmd;
+	uint16_t	mode;
+	uint16_t	Px;
+	uint16_t	Py;
+	uint16_t	Q;
+	uint16_t	Fstart;
+	uint16_t	Fcruise;
+	uint16_t	Fend;
+	uint16_t	Acc;
+	uint16_t	Stotal;
+	uint16_t	Sdec;
+} pl_block_t;
 
 void pl_updatespeed(uint16_t spd);
 bool pl_is_absolute_coord(void);

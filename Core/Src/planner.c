@@ -36,6 +36,13 @@ void pl_updatespeed(uint16_t spd)
 
 void pl_line(pos_t tar_pos, bool is_rapid_move)
 {
+	pl_block_t* pblock = NULL;
+
+	/* get slot */
+	pblock = fpga_wr_buff_start_pl();
+	if (NULL == pblock)
+		return;
+
 
 }
 
