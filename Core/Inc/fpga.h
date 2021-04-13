@@ -8,6 +8,11 @@
 #define SIZE_OF_FPGA_BUFFER			20
 #define FPGA_BUFFER_WR_THRESHOLD	16
 
+/* FPGA command id */
+#define FPGA_CMD_PLOTTER_MOVE				0x040B
+#define FPGA_CMD_PEN_UP						0x0501
+#define FPGA_CMD_PEN_DOWN					0x0601
+
 typedef enum {
 	FPGA_STATUS_READY,
 	FPGA_STATUS_BUSY

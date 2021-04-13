@@ -18,7 +18,7 @@ void plotter_main(void)
 {
 	msg_t msg = {0};
 	osStatus_t ret;
-
+	bool plot_should_work = false;
 	/* start receiving gcode command */
 	gcode_receive();
 
@@ -31,6 +31,8 @@ void plotter_main(void)
 		}
 		else
 		{
+			bool plot_should_work = false;
+
 			switch (msg.msgid)
 			{
 			case GCODE_CMD_RCV_NOTIF_MSG:
@@ -40,7 +42,7 @@ void plotter_main(void)
 					gcode_send_ok();
 
 				// call command execute
-				plotter_work();
+				plot_should_work = true;
 				break;
 
 			case FPGA_STATUS_CHANGE_MSG:
@@ -54,12 +56,16 @@ void plotter_main(void)
 				if (true == fpga_send_ready())
 					fpga_send();
 
+				plot_should_work = true;
 				break;
 			default:
 				break;
 			}
 
-			/*state machine execute */
+			if (plot_should_work)
+			{
+				plotter_work();
+			}
 		}
 
 	}
@@ -75,7 +81,7 @@ static void plotter_work(void)
 		line = gcode_rd_buff();
 		memset(&cmd_block, 0, sizeof(cmd_block_t));
 		if (0 != gcode_parser((char*)line, &cmd_block))
-			continue;	/* ignore the below if cmd parse fail*/
+			continue;	/* ignore the below if cmd parse fail */
 
 		gcode_execute(cmd_block);
 	}

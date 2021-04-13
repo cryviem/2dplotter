@@ -17,6 +17,9 @@
 #define ABSOLUTE_POSITIONING						0
 #define RELATIVE_POSITIONING						1
 
+#define X_DIR_BACKWARD								(uint16_t)0x0100
+#define Y_DIR_BACKWARD								(uint16_t)0x0200
+
 typedef struct {
 	int16_t	x;		/* pulse */
 	int16_t	y;		/* pulse */
