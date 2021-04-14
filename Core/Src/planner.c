@@ -38,7 +38,7 @@ void pl_updatespeed(uint16_t spd)
 void pl_line(pos_t tar_pos, bool is_rapid_move)
 {
 	pl_block_t* pblock = NULL;
-	uint16_t dx, dy;
+	uint16_t u16val1, u16val2;
 	uint32_t u32val;
 
 	/* get slot */
@@ -52,42 +52,60 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 	if (tar_pos.x < 0)
 	{
 		pblock->mode |= X_DIR_BACKWARD;
-		dx = (uint16_t)(-tar_pos.x);
+		u16val1 = (uint16_t)(-tar_pos.x);
 	}
 	else
 	{
-		dx = (uint16_t)tar_pos.x;
+		u16val1 = (uint16_t)tar_pos.x;
 	}
 
 	if (tar_pos.y < 0)
 	{
 		pblock->mode |= Y_DIR_BACKWARD;
-		dy = (uint16_t)(-tar_pos.y);
+		u16val2 = (uint16_t)(-tar_pos.y);
 	}
 	else
 	{
-		dy = (uint16_t)tar_pos.y;
+		u16val2 = (uint16_t)tar_pos.y;
 	}
 
-	pblock->Px = dx;
-	pblock->Py = dy;
+	pblock->Px = u16val1;
+	pblock->Py = u16val2;
 
-	u32val = dx*dx + dy*dy;
+	u32val = u16val1*u16val1 + u16val2*u16val2;
 	u32val = SquareRootRounded(u32val);
 	pblock->Q = u32val;
 	pblock->Stotal = u32val;
 
 	/* speed planner calculation */
 	/* this version use simple speed planner without overlap and look ahead algorithms,
-	 * so start speed and end speed are fixed */
+	 * so start speed and end speed are fixed
+	 * no different between G0 and G1, is_rapid_move is currently not used */
 
+	speed_planner(PLANNER_MIN_FEEDRATE, pl_box.feedrate, PLANNER_MIN_FEEDRATE, pl_box.accel, u32val, &u16val1, &u16val2);
 
+	pblock->Fstart = PLANNER_MIN_FEEDRATE;
+	pblock->Fend = PLANNER_MIN_FEEDRATE;
+	pblock->Fcruise = u16val1;
+	pblock->Sdec = u16val2;
+	pblock->Acc = (uint16_t)ACC_TO_N_FACTOR(pl_box.accel);
+	pblock->cmd = FPGA_CMD_PLOTTER_MOVE;
 
+	/* confirm data ready in buffer */
+	fpga_wr_buff_cmplt();
+
+	/* update current position */
+	pl_box.cur_pos.x += tar_pos.x;
+	pl_box.cur_pos.y += tar_pos.y;
 
 }
 
 void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 {
+	pl_block_t* pblock = NULL;
+	uint16_t u16val1, u16val2;
+	uint32_t u32val;
+
 
 }
 
@@ -123,24 +141,40 @@ int16_t pl_calc_dy(int16_t y)
 	return ret;
 }
 
-void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_deac_from)
+/* calculate speed plan for the block*/
+void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from)
 {
 	uint32_t u32val1, u32val2;
 
-	u32val1 = (fmax*fmax - fstart*fstart) / (2*acc);
-	u32val2 = (fmax*fmax - fend*fend) / (2*acc);
+	/* s = (v^2 - v0^2) / 2a */
+	/* calculate accelerate distance */
+	u32val1 = (fmax*fmax - fstart*fstart) / acc;
+	u32val1 >>= 1;
+	/* calculate decelerate distance */
+	u32val2 = (fmax*fmax - fend*fend) / acc;
+	u32val2  >>= 1;
 
 	if (d_total >= (u32val1 + u32val2))
 	{
+		/* for trapeziod plan, the distance of block must greater than sum of accelerate and decelerate distances */
 		*fcruise = fmax;
-		*d_deac_from = d_total - u32val2;
+		*d_dec_from = d_total - u32val2;
 	}
 	else
 	{
+		/* triangle plan */
+		/* s = s_acc + s_dec
+		 *   = (v^2 - v_start^2) / 2a    +    (v^2 - v_end^2) / 2a
+		 *   = (2v^2 - v_start^2 - v_end^2) / 2a
+		 * v = sqrt((2as + v_start^2 + v_end^2) / 2) */
 		/* find new fcruise */
-		u32val1 = (2*acc*d_total + fstart*fstart + fend*fend) / 2;
+		u32val1 = ((acc << 1)*d_total + fstart*fstart + fend*fend) >> 1;
 		u32val1 = SquareRootRounded(u32val1);
 		*fcruise = u32val1;
+		/* calculate new decelerate distance */
+		u32val2 = (u32val1*u32val1 - fend*fend) / acc;
+		u32val2 = u32val2 >> 1;
+		*d_dec_from = d_total - u32val2;
 		/* continue */
 	}
 }

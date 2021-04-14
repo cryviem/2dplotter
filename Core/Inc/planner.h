@@ -20,6 +20,8 @@
 #define X_DIR_BACKWARD								(uint16_t)0x0100
 #define Y_DIR_BACKWARD								(uint16_t)0x0200
 
+#define FPGA_CLOCK_RATE								(uint32_t)50000000	/*50 MHz*/
+#define ACC_TO_N_FACTOR(x)							(FPGA_CLOCK_RATE / x)
 typedef struct {
 	int16_t	x;		/* pulse */
 	int16_t	y;		/* pulse */
