@@ -4,11 +4,15 @@
  *  Created on: Apr 7, 2021
  *      Author: hanguyen
  */
+#include <math.h>
 #include "app_common.h"
 #include "planner.h"
 #include "fpga.h"
 #include "do_math.h"
+
 pl_data_t	pl_box = {0};
+
+void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from);
 
 void pl_init(void)
 {
@@ -103,8 +107,34 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 {
 	pl_block_t* pblock = NULL;
-	uint16_t u16val1, u16val2;
-	uint32_t u32val;
+	bool is_full_circle = false;
+	uint32_t u32radius;
+	double start_angle, end_angle;
+
+	/* check if is full circle command */
+	if ((tar_pos.x == 0) && (tar_pos.y == 0))
+	{
+		is_full_circle = true;
+	}
+
+	/* calculate radius
+	 * r = sqrt(x^2 + y^2) */
+	u32radius = center.x*center.x + center.y*center.y;
+	u32radius = SquareRootRounded(u32radius);
+
+	/* calculate the angle of start and end point
+	 * consider C(0, 0)
+	 * start point S: xs = -I; ys = -J
+	 * end point E: xe = X - I; ye = Y - J*/
+	start_angle = atan2((double)(-center.y), (double)(-center.x));
+	if (start_angle < 0) start_angle += M_TWOPI;
+
+	if (false == is_full_circle)
+	{
+		end_angle = atan2((double)(tar_pos.y-center.y), (double)(tar_pos.x-center.x));
+		if (end_angle < 0) end_angle += M_TWOPI;
+	}
+
 
 
 }

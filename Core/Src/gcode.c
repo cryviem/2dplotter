@@ -281,6 +281,7 @@ void gcode_execute(cmd_block_t cmd_block)
 	case CMD_G0:
 		is_rapid = true;
 	case CMD_G1:
+		/* for G0 or G1, at least X or Y has to be available */
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
 		{
 			target_pos.x = pl_calc_dx(cmd_block.X);
@@ -302,22 +303,31 @@ void gcode_execute(cmd_block_t cmd_block)
 	case CMD_G3:
 		is_ccw = true;
 	case CMD_G2:
+		/* for G2 or G3, at least I or J has to be available */
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
 		{
 			target_pos.x = pl_calc_dx(cmd_block.X);
-			is_valid = true;
 		}
 
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_Y_BIT))
 		{
 			target_pos.y = pl_calc_dy(cmd_block.Y);
+		}
+
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_I_BIT))
+		{
+			center_pos.x = cmd_block.I;
 			is_valid = true;
 		}
 
-		if ((true == is_valid) && (IS_FLAG_SET(cmd_block.flag, (CMD_STATUS_I_BIT | CMD_STATUS_J_BIT))))
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_J_BIT))
 		{
-			center_pos.x = cmd_block.I;
 			center_pos.y = cmd_block.J;
+			is_valid = true;
+		}
+
+		if (true == is_valid)
+		{
 			pl_arc(target_pos, center_pos, is_ccw);
 		}
 		break;

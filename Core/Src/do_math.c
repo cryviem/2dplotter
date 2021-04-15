@@ -4,7 +4,7 @@
  *  Created on: Apr 13, 2021
  *      Author: hanguyen
  */
-
+#include <stdint.h>
 /**
  * \brief    Fast Square root algorithm, with rounding
  *
