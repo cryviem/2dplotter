@@ -12,7 +12,8 @@
 
 pl_data_t	pl_box = {0};
 
-void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from);
+static void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from);
+static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pangle);
 
 void pl_init(void)
 {
@@ -109,34 +110,115 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 	pl_block_t* pblock = NULL;
 	bool is_full_circle = false;
 	uint32_t u32radius;
-	double start_angle, end_angle;
+	int32_t x0, y0, x1, y1;
+	uint8_t point0_info, point1_info;
+	double point0_angle, point1_angle;
 
-	/* check if is full circle command */
+	/*
+	 * start point S: x0 = -I; y0 = -J
+	 * end point E: x1 = X - I; y1 = Y - J
+	 * */
+	x0 = -center.x;
+	y0 = -center.y;
+
 	if ((tar_pos.x == 0) && (tar_pos.y == 0))
 	{
 		is_full_circle = true;
 	}
+	else
+	{
+		x1 = tar_pos.x - center.x;
+		y1 = tar_pos.y - center.y;
+	}
 
 	/* calculate radius
 	 * r = sqrt(x^2 + y^2) */
-	u32radius = center.x*center.x + center.y*center.y;
+	u32radius = x0*x0 + y0*y0;
 	u32radius = SquareRootRounded(u32radius);
 
-	/* calculate the angle of start and end point
-	 * consider C(0, 0)
-	 * start point S: xs = -I; ys = -J
-	 * end point E: xe = X - I; ye = Y - J*/
-	start_angle = atan2((double)(-center.y), (double)(-center.x));
-	if (start_angle < 0) start_angle += M_TWOPI;
+	/* check special points */
+
+	calc_point_on_arc(x0, y0, &point0_info, &point0_angle);
 
 	if (false == is_full_circle)
 	{
-		end_angle = atan2((double)(tar_pos.y-center.y), (double)(tar_pos.x-center.x));
-		if (end_angle < 0) end_angle += M_TWOPI;
+		calc_point_on_arc(x1, y1, &point1_info, &point1_angle);
 	}
 
 
 
+
+}
+
+/*
+ * pinfo:
+ * 0 - 3 quarants
+ * 4 point A
+ * 5 point B
+ * 6 point C
+ * 7 point D
+ * others invalid*/
+static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pangle)
+{
+
+	if ((x == 0) && (y == 0))
+		return false;
+
+	/* first check special points */
+	if (x == 0)
+	{
+		if (y > 0)
+		{
+			/* point B */
+			*pinfo = 5;
+			*pangle = M_PI_2;
+		}
+		else
+		{
+			/* point D */
+			*pinfo = 7;
+			*pangle = M_PI+M_PI_2;
+		}
+	}
+	else if (y == 0)
+	{
+		if (x > 0)
+		{
+			/* point A */
+			*pinfo = 4;
+			*pangle = 0;
+		}
+		else
+		{
+			/* point C */
+			*pinfo = 6;
+			*pangle = M_PI;
+		}
+	}
+	else
+	{
+		/* not a special point */
+		*pangle = atan2((double)y, (double)x);
+		if (*pangle < 0) *pangle += M_TWOPI;
+
+		if (*pangle < M_PI_2)
+		{
+			*pinfo = 0;
+		}
+		else if (*pangle < M_PI)
+		{
+			*pinfo = 1;
+		}
+		else if (*pangle < (M_PI+M_PI_2))
+		{
+			*pinfo = 2;
+		}
+		else if (*pangle < M_TWOPI)
+		{
+			*pinfo = 3;
+		}
+	}
+	return true;
 }
 
 int16_t pl_calc_dx(int16_t x)
@@ -172,7 +254,7 @@ int16_t pl_calc_dy(int16_t y)
 }
 
 /* calculate speed plan for the block*/
-void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from)
+static void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from)
 {
 	uint32_t u32val1, u32val2;
 
