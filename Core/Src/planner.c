@@ -10,22 +10,13 @@
 #include "fpga.h"
 #include "do_math.h"
 
-#define QUARANT_1				0x01
-#define QUARANT_2				0x02
-#define QUARANT_3				0x04
-#define QUARANT_4				0x08
-#define POINT_A					0x10
-#define POINT_B					0x20
-#define POINT_C					0x40
-#define POINT_D					0x80
-
-#define IS_BITS_SET(value, flag)	(value & flag)? true:false
 
 pl_data_t	pl_box = {0};
 
 static void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from);
 static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pangle);
-static bool is_same_quarant(uint8_t info1, uint8_t info2);
+static bool is_same_quadrant(uint8_t info1, uint8_t info2);
+static uint16_t get_mode_from_quadrant(uint8_t info, bool is_ccw);
 
 void pl_init(void)
 {
@@ -119,8 +110,9 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 
 void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 {
-	pl_block_t* pblock = NULL;
+
 	bool is_full_circle = false;
+	bool is_one_block = false;
 	uint32_t u32radius;
 	int32_t x0, y0, x1, y1;
 	uint8_t point0_info, point1_info;
@@ -160,10 +152,13 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 	if (false == is_ccw)
 	{
 		/* cw */
+		/* check if just 1 block is needed */
 		if (false == is_full_circle)
 		{
-			if(true == is_same_quarant(point0_info, point1_info))
+			/* not a full circle */
+			if(true == is_same_quadrant(point0_info, point1_info))
 			{
+				/* 2 points in same quadrant */
 				if (point0_info == POINT_A)
 				{
 					delta_angle = M_TWOPI - point1_angle;
@@ -176,8 +171,14 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 				if(delta_angle > 0)
 				{
 					/* 1 block needed */
+					is_one_block = true;
 				}
 			}
+		}
+
+		if (false == is_one_block)
+		{
+
 		}
 	}
 
@@ -185,7 +186,7 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 }
 
 
-static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pangle)
+static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pquadrant, double* pangle)
 {
 
 	if ((x == 0) && (y == 0))
@@ -197,13 +198,13 @@ static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pang
 		if (y > 0)
 		{
 			/* point B */
-			*pinfo = POINT_B;
+			*pquadrant = 1;
 			*pangle = M_PI_2;
 		}
 		else
 		{
 			/* point D */
-			*pinfo = POINT_D;
+			*pquadrant = 3;
 			*pangle = M_PI+M_PI_2;
 		}
 	}
@@ -212,13 +213,13 @@ static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pang
 		if (x > 0)
 		{
 			/* point A */
-			*pinfo = POINT_A;
+			*pquadrant = 0;
 			*pangle = 0;
 		}
 		else
 		{
 			/* point C */
-			*pinfo = POINT_C;
+			*pquadrant = 2;
 			*pangle = M_PI;
 		}
 	}
@@ -230,53 +231,53 @@ static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pang
 
 		if (*pangle < M_PI_2)
 		{
-			*pinfo = QUARANT_1;
+			*pquadrant = 0;
 		}
 		else if (*pangle < M_PI)
 		{
-			*pinfo = QUARANT_2;
+			*pquadrant = 1;
 		}
 		else if (*pangle < (M_PI+M_PI_2))
 		{
-			*pinfo = QUARANT_3;
+			*pquadrant = 2;
 		}
 		else if (*pangle < M_TWOPI)
 		{
-			*pinfo = QUARANT_4;
+			*pquadrant = 3;
 		}
 	}
 	return true;
 }
 
-static bool is_same_quarant(uint8_t info1, uint8_t info2)
+static bool is_same_quadrant(uint8_t info1, uint8_t info2)
 {
 	bool ret = false;
 
 	switch (info1)
 	{
-	case QUARANT_1:
+	case QUADRANT_1:
 		ret = IS_BITS_SET(info2, (POINT_A | POINT_B));
 		break;
-	case QUARANT_2:
+	case QUADRANT_2:
 		ret = IS_BITS_SET(info2, (POINT_B | POINT_C));
 		break;
-	case QUARANT_3:
+	case QUADRANT_3:
 		ret = IS_BITS_SET(info2, (POINT_C | POINT_D));
 		break;
-	case QUARANT_4:
+	case QUADRANT_4:
 		ret = IS_BITS_SET(info2, (POINT_D | POINT_A));
 		break;
 	case POINT_A:
-		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_4 | POINT_B | POINT_D));
+		ret = IS_BITS_SET(info2, (QUADRANT_1 | QUADRANT_4 | POINT_B | POINT_D));
 		break;
 	case POINT_B:
-		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_2 | POINT_A | POINT_C));
+		ret = IS_BITS_SET(info2, (QUADRANT_1 | QUADRANT_2 | POINT_A | POINT_C));
 		break;
 	case POINT_C:
-		ret = IS_BITS_SET(info2, (QUARANT_2 | QUARANT_3 | POINT_B | POINT_D));
+		ret = IS_BITS_SET(info2, (QUADRANT_2 | QUADRANT_3 | POINT_B | POINT_D));
 		break;
 	case POINT_D:
-		ret = IS_BITS_SET(info2, (QUARANT_3 | QUARANT_4 | POINT_C | POINT_A));
+		ret = IS_BITS_SET(info2, (QUADRANT_3 | QUADRANT_4 | POINT_C | POINT_A));
 		break;
 	default:
 		break;
@@ -284,54 +285,74 @@ static bool is_same_quarant(uint8_t info1, uint8_t info2)
 	return ret;
 }
 
-uint16_t get_mode_from_quarant(uint8_t info, bool is_ccw)
+static uint16_t get_mode_from_quadrant(uint8_t info, bool is_ccw)
 {
 	uint16_t ret = 0;
-	switch (info)
+	if (false == is_ccw)
 	{
-	case QUARANT_1:
-		if (false == is_ccw)
+		switch (info)
+		{
+		case QUADRANT_1:
+		case POINT_B:
 			ret = (X_DIR_FORWARD + Y_DIR_BACKWARD + PX_DECREASE + PY_INCREASE);
-		else
-			ret = (X_DIR_BACKWARD + Y_DIR_FORWARD + PX_INCREASE + PY_DECREASE);
-		break;
-	case QUARANT_2:
-		if (false == is_ccw)
+			break;
+		case QUADRANT_2:
+		case POINT_C:
 			ret = (X_DIR_FORWARD + Y_DIR_FORWARD + PX_INCREASE + PY_DECREASE);
-		else
-			ret = (X_DIR_BACKWARD + Y_DIR_BACKWARD + PX_DECREASE + PY_INCREASE);
-		break;
-	case QUARANT_3:
-		if (false == is_ccw)
+			break;
+		case QUADRANT_3:
+		case POINT_D:
 			ret = (X_DIR_BACKWARD + Y_DIR_FORWARD + PX_DECREASE + PY_INCREASE);
-		else
-			ret = (X_DIR_FORWARD + Y_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
-		break;
-		break;
-	case QUARANT_4:
-		if (false == is_ccw)
-			ret = (X_DIR_BACKWARD + X_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
-		else
-			ret = (X_DIR_FORWARD + Y_DIR_FORWARD + PX_DECREASE + PY_INCREASE);
-		break;
-	case POINT_A:
-		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_4 | POINT_B | POINT_D));
-		break;
-	case POINT_B:
-		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_2 | POINT_A | POINT_C));
-		break;
-	case POINT_C:
-		ret = IS_BITS_SET(info2, (QUARANT_2 | QUARANT_3 | POINT_B | POINT_D));
-		break;
-	case POINT_D:
-		ret = IS_BITS_SET(info2, (QUARANT_3 | QUARANT_4 | POINT_C | POINT_A));
-		break;
-	default:
-		break;
+			break;
+		case QUADRANT_4:
+		case POINT_A:
+			ret = (X_DIR_BACKWARD + Y_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
+			break;
+		default:
+			break;
+		}
 	}
+	else
+	{
+		switch (info)
+		{
+		case QUADRANT_1:
+		case POINT_A:
+			ret = (X_DIR_BACKWARD + Y_DIR_FORWARD + PX_INCREASE + PY_DECREASE);
+			break;
+		case QUADRANT_2:
+		case POINT_B:
+			ret = (X_DIR_BACKWARD + Y_DIR_BACKWARD + PX_DECREASE + PY_INCREASE);
+			break;
+		case QUADRANT_3:
+		case POINT_C:
+			ret = (X_DIR_FORWARD + Y_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
+			break;
+		case QUADRANT_4:
+		case POINT_D:
+			ret = (X_DIR_FORWARD + Y_DIR_FORWARD + PX_DECREASE + PY_INCREASE);
+			break;
+		default:
+			break;
+		}
+	}
+
+	return ret;
 }
 
-int16_t pl_calc_dx(int16_t x)
+static bool build_arc_block(uint16_t mode, uint16_t px, uint16_t py, uint16_t radius, double angle)
+{
+	pl_block_t* pblock = NULL;
+
+	/* get slot */
+	pblock = fpga_wr_buff_start_pl();
+	if (NULL == pblock)
+		return false;
+
+	pblock->mode = mode;
+	pblock->Px =
+}
+ int16_t pl_calc_dx(int16_t x)
 {
 	int16_t ret = 0;
 
