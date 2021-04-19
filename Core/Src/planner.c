@@ -10,10 +10,22 @@
 #include "fpga.h"
 #include "do_math.h"
 
+#define QUARANT_1				0x01
+#define QUARANT_2				0x02
+#define QUARANT_3				0x04
+#define QUARANT_4				0x08
+#define POINT_A					0x10
+#define POINT_B					0x20
+#define POINT_C					0x40
+#define POINT_D					0x80
+
+#define IS_BITS_SET(value, flag)	(value & flag)? true:false
+
 pl_data_t	pl_box = {0};
 
 static void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from);
 static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pangle);
+static bool is_same_quarant(uint8_t info1, uint8_t info2);
 
 void pl_init(void)
 {
@@ -112,7 +124,7 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 	uint32_t u32radius;
 	int32_t x0, y0, x1, y1;
 	uint8_t point0_info, point1_info;
-	double point0_angle, point1_angle;
+	double point0_angle, point1_angle, delta_angle;
 
 	/*
 	 * start point S: x0 = -I; y0 = -J
@@ -145,19 +157,34 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 		calc_point_on_arc(x1, y1, &point1_info, &point1_angle);
 	}
 
+	if (false == is_ccw)
+	{
+		/* cw */
+		if (false == is_full_circle)
+		{
+			if(true == is_same_quarant(point0_info, point1_info))
+			{
+				if (point0_info == POINT_A)
+				{
+					delta_angle = M_TWOPI - point1_angle;
+				}
+				else
+				{
+					delta_angle = point0_angle - point1_angle;
+				}
 
+				if(delta_angle > 0)
+				{
+					/* 1 block needed */
+				}
+			}
+		}
+	}
 
 
 }
 
-/*
- * pinfo:
- * 0 - 3 quarants
- * 4 point A
- * 5 point B
- * 6 point C
- * 7 point D
- * others invalid*/
+
 static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pangle)
 {
 
@@ -170,13 +197,13 @@ static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pang
 		if (y > 0)
 		{
 			/* point B */
-			*pinfo = 5;
+			*pinfo = POINT_B;
 			*pangle = M_PI_2;
 		}
 		else
 		{
 			/* point D */
-			*pinfo = 7;
+			*pinfo = POINT_D;
 			*pangle = M_PI+M_PI_2;
 		}
 	}
@@ -185,13 +212,13 @@ static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pang
 		if (x > 0)
 		{
 			/* point A */
-			*pinfo = 4;
+			*pinfo = POINT_A;
 			*pangle = 0;
 		}
 		else
 		{
 			/* point C */
-			*pinfo = 6;
+			*pinfo = POINT_C;
 			*pangle = M_PI;
 		}
 	}
@@ -203,22 +230,105 @@ static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pang
 
 		if (*pangle < M_PI_2)
 		{
-			*pinfo = 0;
+			*pinfo = QUARANT_1;
 		}
 		else if (*pangle < M_PI)
 		{
-			*pinfo = 1;
+			*pinfo = QUARANT_2;
 		}
 		else if (*pangle < (M_PI+M_PI_2))
 		{
-			*pinfo = 2;
+			*pinfo = QUARANT_3;
 		}
 		else if (*pangle < M_TWOPI)
 		{
-			*pinfo = 3;
+			*pinfo = QUARANT_4;
 		}
 	}
 	return true;
+}
+
+static bool is_same_quarant(uint8_t info1, uint8_t info2)
+{
+	bool ret = false;
+
+	switch (info1)
+	{
+	case QUARANT_1:
+		ret = IS_BITS_SET(info2, (POINT_A | POINT_B));
+		break;
+	case QUARANT_2:
+		ret = IS_BITS_SET(info2, (POINT_B | POINT_C));
+		break;
+	case QUARANT_3:
+		ret = IS_BITS_SET(info2, (POINT_C | POINT_D));
+		break;
+	case QUARANT_4:
+		ret = IS_BITS_SET(info2, (POINT_D | POINT_A));
+		break;
+	case POINT_A:
+		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_4 | POINT_B | POINT_D));
+		break;
+	case POINT_B:
+		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_2 | POINT_A | POINT_C));
+		break;
+	case POINT_C:
+		ret = IS_BITS_SET(info2, (QUARANT_2 | QUARANT_3 | POINT_B | POINT_D));
+		break;
+	case POINT_D:
+		ret = IS_BITS_SET(info2, (QUARANT_3 | QUARANT_4 | POINT_C | POINT_A));
+		break;
+	default:
+		break;
+	}
+	return ret;
+}
+
+uint16_t get_mode_from_quarant(uint8_t info, bool is_ccw)
+{
+	uint16_t ret = 0;
+	switch (info)
+	{
+	case QUARANT_1:
+		if (false == is_ccw)
+			ret = (X_DIR_FORWARD + Y_DIR_BACKWARD + PX_DECREASE + PY_INCREASE);
+		else
+			ret = (X_DIR_BACKWARD + Y_DIR_FORWARD + PX_INCREASE + PY_DECREASE);
+		break;
+	case QUARANT_2:
+		if (false == is_ccw)
+			ret = (X_DIR_FORWARD + Y_DIR_FORWARD + PX_INCREASE + PY_DECREASE);
+		else
+			ret = (X_DIR_BACKWARD + Y_DIR_BACKWARD + PX_DECREASE + PY_INCREASE);
+		break;
+	case QUARANT_3:
+		if (false == is_ccw)
+			ret = (X_DIR_BACKWARD + Y_DIR_FORWARD + PX_DECREASE + PY_INCREASE);
+		else
+			ret = (X_DIR_FORWARD + Y_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
+		break;
+		break;
+	case QUARANT_4:
+		if (false == is_ccw)
+			ret = (X_DIR_BACKWARD + X_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
+		else
+			ret = (X_DIR_FORWARD + Y_DIR_FORWARD + PX_DECREASE + PY_INCREASE);
+		break;
+	case POINT_A:
+		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_4 | POINT_B | POINT_D));
+		break;
+	case POINT_B:
+		ret = IS_BITS_SET(info2, (QUARANT_1 | QUARANT_2 | POINT_A | POINT_C));
+		break;
+	case POINT_C:
+		ret = IS_BITS_SET(info2, (QUARANT_2 | QUARANT_3 | POINT_B | POINT_D));
+		break;
+	case POINT_D:
+		ret = IS_BITS_SET(info2, (QUARANT_3 | QUARANT_4 | POINT_C | POINT_A));
+		break;
+	default:
+		break;
+	}
 }
 
 int16_t pl_calc_dx(int16_t x)
