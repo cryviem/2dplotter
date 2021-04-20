@@ -14,9 +14,7 @@
 pl_data_t	pl_box = {0};
 
 static void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from);
-static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pinfo, double* pangle);
-static bool is_same_quadrant(uint8_t info1, uint8_t info2);
-static uint16_t get_mode_from_quadrant(uint8_t info, bool is_ccw);
+static uint8_t find_quadrant(int32_t x, int32_t y);
 
 void pl_init(void)
 {
@@ -112,11 +110,10 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 {
 
 	bool is_full_circle = false;
-	bool is_one_block = false;
 	uint32_t u32radius;
 	int32_t x0, y0, x1, y1;
-	uint8_t point0_info, point1_info;
-	double point0_angle, point1_angle, delta_angle;
+	uint8_t quadrant0, quadrant1;
+	double angle0, angle1, delta_rad;
 
 	/*
 	 * start point S: x0 = -I; y0 = -J
@@ -124,234 +121,80 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 	 * */
 	x0 = -center.x;
 	y0 = -center.y;
-
-	if ((tar_pos.x == 0) && (tar_pos.y == 0))
-	{
-		is_full_circle = true;
-	}
-	else
-	{
-		x1 = tar_pos.x - center.x;
-		y1 = tar_pos.y - center.y;
-	}
+	quadrant0 = find_quadrant(x0, y0);
+	angle0 = atan2((double)y0, (double)x0);
+	if (angle0 < 0) angle0 += M_TWOPI;
 
 	/* calculate radius
 	 * r = sqrt(x^2 + y^2) */
 	u32radius = x0*x0 + y0*y0;
 	u32radius = SquareRootRounded(u32radius);
 
-	/* check special points */
-
-	calc_point_on_arc(x0, y0, &point0_info, &point0_angle);
-
-	if (false == is_full_circle)
+	if ((tar_pos.x == 0) && (tar_pos.y == 0))
 	{
-		calc_point_on_arc(x1, y1, &point1_info, &point1_angle);
+		is_full_circle = true;
+		x1 = x0;
+		y1 = y0;
+		quadrant1 = quadrant0;
+		angle1 = angle0;
+	}
+	else
+	{
+		x1 = tar_pos.x - center.x;
+		y1 = tar_pos.y - center.y;
+		quadrant1 = find_quadrant(x1, y1);
+		angle1 = atan2((double)y1, (double)x1);
+		if (angle1 < 0) angle1 += M_TWOPI;
 	}
 
-	if (false == is_ccw)
+	if (true == is_ccw)
 	{
-		/* cw */
-		/* check if just 1 block is needed */
-		if (false == is_full_circle)
+		if ((false == is_full_circle) && (quadrant0 == quadrant1) && ((angle1 - angle0) > 0))
 		{
-			/* not a full circle */
-			if(true == is_same_quadrant(point0_info, point1_info))
-			{
-				/* 2 points in same quadrant */
-				if (point0_info == POINT_A)
-				{
-					delta_angle = M_TWOPI - point1_angle;
-				}
-				else
-				{
-					delta_angle = point0_angle - point1_angle;
-				}
-
-				if(delta_angle > 0)
-				{
-					/* 1 block needed */
-					is_one_block = true;
-				}
-			}
-		}
-
-		if (false == is_one_block)
-		{
-
-		}
-	}
-
-
-}
-
-
-static bool calc_point_on_arc(int32_t x, int32_t y, uint8_t* pquadrant, double* pangle)
-{
-
-	if ((x == 0) && (y == 0))
-		return false;
-
-	/* first check special points */
-	if (x == 0)
-	{
-		if (y > 0)
-		{
-			/* point B */
-			*pquadrant = 1;
-			*pangle = M_PI_2;
+			/* 1 block */
+			delta_rad =
 		}
 		else
 		{
-			/* point D */
-			*pquadrant = 3;
-			*pangle = M_PI+M_PI_2;
-		}
-	}
-	else if (y == 0)
-	{
-		if (x > 0)
-		{
-			/* point A */
-			*pquadrant = 0;
-			*pangle = 0;
-		}
-		else
-		{
-			/* point C */
-			*pquadrant = 2;
-			*pangle = M_PI;
+			/* multiple blocks */
 		}
 	}
 	else
 	{
-		/* not a special point */
-		*pangle = atan2((double)y, (double)x);
-		if (*pangle < 0) *pangle += M_TWOPI;
-
-		if (*pangle < M_PI_2)
+		if ((false == is_full_circle) && (quadrant0 == quadrant1) &&
+			(((quadrant0 < 2) && (x0 < x1)) || ((quadrant0 >= 2) && (x1 < x0))))
 		{
-			*pquadrant = 0;
+			/* 1 block */
 		}
-		else if (*pangle < M_PI)
+		else
 		{
-			*pquadrant = 1;
-		}
-		else if (*pangle < (M_PI+M_PI_2))
-		{
-			*pquadrant = 2;
-		}
-		else if (*pangle < M_TWOPI)
-		{
-			*pquadrant = 3;
+			/* multiple blocks */
 		}
 	}
-	return true;
+
+
 }
 
-static bool is_same_quadrant(uint8_t info1, uint8_t info2)
-{
-	bool ret = false;
 
-	switch (info1)
-	{
-	case QUADRANT_1:
-		ret = IS_BITS_SET(info2, (POINT_A | POINT_B));
-		break;
-	case QUADRANT_2:
-		ret = IS_BITS_SET(info2, (POINT_B | POINT_C));
-		break;
-	case QUADRANT_3:
-		ret = IS_BITS_SET(info2, (POINT_C | POINT_D));
-		break;
-	case QUADRANT_4:
-		ret = IS_BITS_SET(info2, (POINT_D | POINT_A));
-		break;
-	case POINT_A:
-		ret = IS_BITS_SET(info2, (QUADRANT_1 | QUADRANT_4 | POINT_B | POINT_D));
-		break;
-	case POINT_B:
-		ret = IS_BITS_SET(info2, (QUADRANT_1 | QUADRANT_2 | POINT_A | POINT_C));
-		break;
-	case POINT_C:
-		ret = IS_BITS_SET(info2, (QUADRANT_2 | QUADRANT_3 | POINT_B | POINT_D));
-		break;
-	case POINT_D:
-		ret = IS_BITS_SET(info2, (QUADRANT_3 | QUADRANT_4 | POINT_C | POINT_A));
-		break;
-	default:
-		break;
-	}
-	return ret;
-}
-
-static uint16_t get_mode_from_quadrant(uint8_t info, bool is_ccw)
+static uint8_t find_quadrant(int32_t x, int32_t y)
 {
-	uint16_t ret = 0;
-	if (false == is_ccw)
+	uint8_t ret;
+	if (x >= 0)
 	{
-		switch (info)
-		{
-		case QUADRANT_1:
-		case POINT_B:
-			ret = (X_DIR_FORWARD + Y_DIR_BACKWARD + PX_DECREASE + PY_INCREASE);
-			break;
-		case QUADRANT_2:
-		case POINT_C:
-			ret = (X_DIR_FORWARD + Y_DIR_FORWARD + PX_INCREASE + PY_DECREASE);
-			break;
-		case QUADRANT_3:
-		case POINT_D:
-			ret = (X_DIR_BACKWARD + Y_DIR_FORWARD + PX_DECREASE + PY_INCREASE);
-			break;
-		case QUADRANT_4:
-		case POINT_A:
-			ret = (X_DIR_BACKWARD + Y_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
-			break;
-		default:
-			break;
-		}
+		if (y >= 0)
+			ret = 0;
+		else
+			ret = 3;
 	}
 	else
 	{
-		switch (info)
-		{
-		case QUADRANT_1:
-		case POINT_A:
-			ret = (X_DIR_BACKWARD + Y_DIR_FORWARD + PX_INCREASE + PY_DECREASE);
-			break;
-		case QUADRANT_2:
-		case POINT_B:
-			ret = (X_DIR_BACKWARD + Y_DIR_BACKWARD + PX_DECREASE + PY_INCREASE);
-			break;
-		case QUADRANT_3:
-		case POINT_C:
-			ret = (X_DIR_FORWARD + Y_DIR_BACKWARD + PX_INCREASE + PY_DECREASE);
-			break;
-		case QUADRANT_4:
-		case POINT_D:
-			ret = (X_DIR_FORWARD + Y_DIR_FORWARD + PX_DECREASE + PY_INCREASE);
-			break;
-		default:
-			break;
-		}
+		if (y >= 0)
+			ret = 1;
+		else
+			ret = 2;
 	}
-
-	return ret;
 }
 
-static bool build_arc_block(uint16_t mode, uint16_t px, uint16_t py, uint16_t radius, double angle)
-{
-	pl_block_t* pblock = NULL;
-
-	/* get slot */
-	pblock = fpga_wr_buff_start_pl();
-	if (NULL == pblock)
-		return false;
-
-	pblock->mode = mode;
-	pblock->Px =
-}
  int16_t pl_calc_dx(int16_t x)
 {
 	int16_t ret = 0;
