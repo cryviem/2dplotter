@@ -19,6 +19,7 @@ void plotter_main(void)
 	msg_t msg = {0};
 	osStatus_t ret;
 	bool plot_should_work = false;
+	pl_init();
 	/* start receiving gcode command */
 	gcode_receive();
 

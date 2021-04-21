@@ -22,9 +22,10 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"G1",			CMD_G1},
 		{"G2",			CMD_G2},
 		{"G3",			CMD_G3},
-		{"G4",			CMD_G4}
+		{"M03",			CMD_M03},
+		{"M03",			CMD_M05},
 };
-const uint32_t decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 10, 100, 1000, 10000};
+const int32_t decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 10, 100, 1000, 10000};
 
 gcode_buffer_t gcode_buff = {0};
 cmd_block_t cmd_box = {0};
@@ -34,7 +35,7 @@ gcode_state_en gcode_state = STATE_IDLE;
 
 static uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
 static gcode_cmd_en search_cmd(char * str);
-static int8_t param_extract(char* letter, int32_t* i32val, char* str);
+static int8_t param_extract(char* letter, int32_t* i32val, uint8_t* dec_cnt, char* str);
 
 
 
@@ -74,7 +75,7 @@ static gcode_cmd_en search_cmd(char * str)
 }
 
 /* extract letter and float values from string */
-static int8_t param_extract(char* letter, int32_t* i32val, char* str)
+static int8_t param_extract(char* letter, int32_t* i32val, uint8_t* dec_cnt, char* str)
 {
 	uint16_t pointer = 0;
 	int32_t	sign_value = 1;
@@ -136,10 +137,11 @@ static int8_t param_extract(char* letter, int32_t* i32val, char* str)
 		}
 	}
 
-	lu32val = ((lu32val * MM_TO_PULSE) / decimal_factor[decimal_cnt]);
+	/*lu32val = ((lu32val * MM_TO_PULSE) / decimal_factor[decimal_cnt]);*/
 
 	/* sign apply */
 	*i32val = (int32_t)lu32val * sign_value;
+	*dec_cnt = decimal_cnt;
 	return 0;
 }
 
@@ -147,7 +149,7 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
 {
     char* cmd_arg[CMD_MAX_ITEM];
     uint8_t cmd_arg_count = 0;
-    uint8_t i;
+    uint8_t i, dec_counter;
     char letter = 0;
     char delimeter = ' ';
     int32_t i32val = 0;
@@ -169,7 +171,7 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
 
     for (i = 1; i < cmd_arg_count; i++)
     {
-    	ret = param_extract(&letter, &i32val, cmd_arg[i]);
+    	ret = param_extract(&letter, &i32val, &dec_counter, cmd_arg[i]);
     	if (ret != 0)
     	{
     		return -1;
@@ -178,33 +180,32 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
     	switch (letter)
     	{
     	case 'X':
-    		cmd_block->X = (int16_t)i32val;
+    		cmd_block->X = (int16_t)( i32val * MM_TO_PULSE / decimal_factor[dec_counter]);
     		cmd_block->flag |= CMD_STATUS_X_BIT;
     		break;
 
     	case 'Y':
-    		cmd_block->Y = (int16_t)i32val;
+    		cmd_block->Y = (int16_t)( i32val * MM_TO_PULSE / decimal_factor[dec_counter]);
     		cmd_block->flag |= CMD_STATUS_Y_BIT;
     		break;
 
     	case 'I':
-    		cmd_block->I = (int16_t)i32val;
+    		cmd_block->I = (int16_t)( i32val * MM_TO_PULSE / decimal_factor[dec_counter]);
     		cmd_block->flag |= CMD_STATUS_I_BIT;
     		break;
 
     	case 'J':
-    		cmd_block->J = (int16_t)i32val;
+    		cmd_block->J = (int16_t)( i32val * MM_TO_PULSE / decimal_factor[dec_counter]);
     		cmd_block->flag |= CMD_STATUS_J_BIT;
     		break;
 
     	case 'F':
-    		cmd_block->F = (uint16_t)(i32val / 60); /* i32val is pulse/min, need convert to pulse/s */
+    		cmd_block->F = (int16_t)( i32val * MM_TO_PULSE / (decimal_factor[dec_counter] * 60));
     		cmd_block->flag |= CMD_STATUS_F_BIT;
     		break;
 
-    	case 'P':
-    		cmd_block->P = (uint16_t)i32val;
-    		cmd_block->flag |= CMD_STATUS_P_BIT;
+    	default:
+    		/* don't care */
     		break;
     	}
     }
@@ -270,7 +271,7 @@ void gcode_execute(cmd_block_t cmd_block)
 	bool is_ccw = false;
 	bool is_valid = false;
 
-	/* feedrate update */
+	/* feed rate update */
 	if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_F_BIT))
 	{
 		pl_updatespeed(cmd_block.F);
@@ -331,7 +332,14 @@ void gcode_execute(cmd_block_t cmd_block)
 			pl_arc(target_pos, center_pos, is_ccw);
 		}
 		break;
+	case CMD_M03:
+		fpga_wr_single_cmd(FPGA_CMD_PEN_UP);
+		break;
+	case CMD_M05:
+		fpga_wr_single_cmd(FPGA_CMD_PEN_DOWN);
+		break;
 	default:
 		break;
 	}
 }
+

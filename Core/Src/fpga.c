@@ -47,6 +47,19 @@ pl_block_t* fpga_wr_buff_start_pl(void)
 	}
 }
 
+bool fpga_wr_single_cmd(uint16_t cmd)
+{
+	if (fpga_buff.load_cnt < SIZE_OF_FPGA_BUFFER)
+	{
+		fpga_buff.packet[fpga_buff.wptr].one_word = cmd;
+		fpga_buff.load_cnt++;
+		fpga_buff.wptr = (fpga_buff.wptr + 1) % SIZE_OF_FPGA_BUFFER;
+		return true;
+	}
+
+	return false;
+}
+
 void fpga_wr_buff_cmplt(void)
 {
 	fpga_buff.load_cnt++;
@@ -83,15 +96,29 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	{
 		/* rising edge */
 		fpga_sts = FPGA_STATUS_BUSY;
+		LED_ORANGE_ON();
 	}
 	else
 	{
 		/* falling edge */
 		fpga_sts = FPGA_STATUS_READY;
+		LED_ORANGE_OFF();
 	}
 
 	msg.payload.fpga_sts = fpga_sts;
 	msg.msgid = FPGA_STATUS_CHANGE_MSG;
 	/* notify spi_task */
 	osMessageQueuePut(plotter_queueHandle, &msg,0,0);
+}
+
+void fpga_enable(void)
+{
+	HAL_GPIO_WritePin(FPGA_EN_GPIO_Port, FPGA_EN_Pin, GPIO_PIN_SET);
+	LED_GREEN_ON();
+}
+
+void fpga_disable(void)
+{
+	HAL_GPIO_WritePin(FPGA_EN_GPIO_Port, FPGA_EN_Pin, GPIO_PIN_RESET);
+	LED_GREEN_OFF();
 }

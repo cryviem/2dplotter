@@ -17,16 +17,12 @@
 #define ABSOLUTE_POSITIONING						0
 #define RELATIVE_POSITIONING						1
 
-#define X_DIR_FORWARD								(uint16_t)0x0000
-#define X_DIR_BACKWARD								(uint16_t)0x0100
-#define Y_DIR_FORWARD								(uint16_t)0x0000
-#define Y_DIR_BACKWARD								(uint16_t)0x0200
-#define PX_INCREASE									(uint16_t)0x0002
-#define PX_DECREASE									(uint16_t)0x0003
-#define PY_INCREASE									(uint16_t)0x0008
-#define PY_DECREASE									(uint16_t)0x000C
 #define FPGA_CLOCK_RATE								(uint32_t)50000000	/*50 MHz*/
 #define ACC_TO_N_FACTOR(x)							(FPGA_CLOCK_RATE / x)
+
+#define X_DIR_BACKWARD								0x0100;
+#define Y_DIR_BACKWARD								0x0200;
+
 typedef struct {
 	int16_t	x;		/* pulse */
 	int16_t	y;		/* pulse */

@@ -8,7 +8,7 @@
 #ifndef GCODE_H
 #define GCODE_H
 
-#define MM_TO_PULSE					(uint32_t)80
+#define MM_TO_PULSE					80
 
 #define CMD_MAX_ITEM				5
 #define GCODE_MAX_ITEM_SIZE			100
@@ -29,7 +29,8 @@ typedef enum
 	CMD_G1,
 	CMD_G2,
 	CMD_G3,
-	CMD_G4,
+	CMD_M03,
+	CMD_M05,
 	CMD_INVALID
 }gcode_cmd_en;
 
@@ -51,7 +52,6 @@ typedef struct{
     int16_t			I;
     int16_t			J;
     uint16_t		F;
-    uint16_t		P;
     uint16_t		flag;
 }cmd_block_t;
 

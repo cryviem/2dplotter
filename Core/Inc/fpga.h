@@ -20,6 +20,7 @@ typedef enum {
 
 typedef union {
 	pl_block_t		pl_data;
+	uint16_t		one_word;
 	uint16_t		rawdata[SIZE_OF_FPGA_PACKET];
 } fpga_packet_t;
 
@@ -35,7 +36,9 @@ bool fpga_send_ready(void);
 bool fpga_send(void);
 bool fpga_wr_ready(void);
 pl_block_t* fpga_wr_buff_start_pl(void);
+bool fpga_wr_single_cmd(uint16_t cmd);
 void fpga_wr_buff_cmplt(void);
 void fpga_rd_buff_cmplt(void);
-
+void fpga_enable(void);
+void fpga_disable(void);
 #endif /* FPGA_H */

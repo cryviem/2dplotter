@@ -353,7 +353,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : FPGA_BUSY_Pin */
   GPIO_InitStruct.Pin = FPGA_BUSY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(FPGA_BUSY_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LED_GREEN_Pin LED_ORANGE_Pin LED_RED_Pin LED_BLUE_Pin */
@@ -398,6 +398,7 @@ void periodic_task(void *argument)
 {
   /* USER CODE BEGIN periodic_task */
 	uint8_t eventcnt = 0;
+	bool flag = false;
 	/* Infinite loop */
 	for(;;)
 	{
@@ -415,6 +416,16 @@ void periodic_task(void *argument)
 		if (eventcnt > BUTTON_FILTERTIME)
 		{
 			/* button pressed detected */
+			if (false == flag)
+			{
+				fpga_enable();
+				flag = true;
+			}
+			else
+			{
+				fpga_disable();
+				flag = false;
+			}
 			eventcnt = 0;
 		}
 	}
