@@ -428,6 +428,8 @@ void periodic_task(void *argument)
 			}
 			eventcnt = 0;
 		}
+
+		fpga_sts_periodic();
 	}
   /* USER CODE END periodic_task */
 }

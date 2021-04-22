@@ -55,6 +55,7 @@ typedef struct {
 	uint16_t	Sdec;
 } pl_block_t;
 
+void pl_init(void);
 void pl_updatespeed(uint16_t spd);
 bool pl_is_absolute_coord(void);
 int16_t pl_calc_dx(int16_t x);

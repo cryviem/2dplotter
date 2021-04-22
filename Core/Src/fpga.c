@@ -103,14 +103,32 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		/* falling edge */
 		fpga_sts = FPGA_STATUS_READY;
 		LED_ORANGE_OFF();
+
+		msg.payload.fpga_sts = fpga_sts;
+		msg.msgid = FPGA_STATUS_CHANGE_MSG;
+		/* notify spi_task */
+		osMessageQueuePut(plotter_queueHandle, &msg,0,0);
 	}
-
-	msg.payload.fpga_sts = fpga_sts;
-	msg.msgid = FPGA_STATUS_CHANGE_MSG;
-	/* notify spi_task */
-	osMessageQueuePut(plotter_queueHandle, &msg,0,0);
 }
-
+void fpga_sts_periodic(void)
+{
+	if (GPIO_PIN_SET == HAL_GPIO_ReadPin(GPIOB, FPGA_BUSY_Pin))
+	{
+		if (fpga_sts == FPGA_STATUS_READY)
+		{
+			fpga_sts = FPGA_STATUS_BUSY;
+			LED_ORANGE_ON();
+		}
+	}
+	else
+	{
+		if (fpga_sts == FPGA_STATUS_BUSY)
+		{
+			fpga_sts = FPGA_STATUS_READY;
+			LED_ORANGE_OFF();
+		}
+	}
+}
 void fpga_enable(void)
 {
 	HAL_GPIO_WritePin(FPGA_EN_GPIO_Port, FPGA_EN_Pin, GPIO_PIN_SET);

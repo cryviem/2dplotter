@@ -23,7 +23,7 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"G2",			CMD_G2},
 		{"G3",			CMD_G3},
 		{"M03",			CMD_M03},
-		{"M03",			CMD_M05},
+		{"M05",			CMD_M05},
 };
 const int32_t decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 10, 100, 1000, 10000};
 
@@ -225,7 +225,7 @@ bool gcode_receive(void)
 
 void gcode_send_ok(void)
 {
-	HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
+	HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 2);
 }
 
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)

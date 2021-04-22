@@ -41,4 +41,5 @@ void fpga_wr_buff_cmplt(void);
 void fpga_rd_buff_cmplt(void);
 void fpga_enable(void);
 void fpga_disable(void);
+void fpga_sts_periodic(void);
 #endif /* FPGA_H */

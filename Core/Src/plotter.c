@@ -32,7 +32,7 @@ void plotter_main(void)
 		}
 		else
 		{
-			bool plot_should_work = false;
+			plot_should_work = false;
 
 			switch (msg.msgid)
 			{
@@ -63,9 +63,11 @@ void plotter_main(void)
 				break;
 			}
 
-			if (plot_should_work)
+			if (true == plot_should_work)
 			{
 				plotter_work();
+				if (true == fpga_send_ready())
+					fpga_send();
 			}
 		}
 
