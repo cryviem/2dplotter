@@ -419,11 +419,13 @@ void periodic_task(void *argument)
 			if (false == flag)
 			{
 				fpga_enable();
+				pl_enable();
 				flag = true;
 			}
 			else
 			{
 				fpga_disable();
+				pl_disable();
 				flag = false;
 			}
 			eventcnt = 0;

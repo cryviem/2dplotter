@@ -22,15 +22,18 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"G1",			CMD_G1},
 		{"G2",			CMD_G2},
 		{"G3",			CMD_G3},
+		{"G20",			CMD_G20},
+		{"G21",			CMD_G21},
+		{"G90",			CMD_G90},
+		{"G91",			CMD_G91},
 		{"M03",			CMD_M03},
 		{"M05",			CMD_M05},
+		{"M17",			CMD_M17},
+		{"M18",			CMD_M18},
 };
 const int32_t decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 10, 100, 1000, 10000};
 
 gcode_buffer_t gcode_buff = {0};
-cmd_block_t cmd_box = {0};
-gcode_state_en gcode_state = STATE_IDLE;
-
 
 
 static uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
@@ -238,8 +241,13 @@ void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)
 
 void gcode_wr_buff_cmplt(void)
 {
-	/* add '\0' to make a complete string */
-	gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize] = 0;
+	/* refine input string before parsing:
+	 * 	remove \n character, add \0 to the end */
+	if (gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize - 1] == '\n')
+		gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize - 1] = 0;
+	else
+		gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize] = 0;
+
 	gcode_buff.load_cnt++;
 	gcode_buff.wptr = (gcode_buff.wptr + 1) % GCODE_MAX_BUFF_ITEM;
 }
@@ -267,6 +275,7 @@ void gcode_execute(cmd_block_t cmd_block)
 {
 	pos_t target_pos = {0, 0};
 	pos_t center_pos = {0, 0};
+	int16_t  i16val;
 	bool is_rapid = false;
 	bool is_ccw = false;
 	bool is_valid = false;
@@ -285,14 +294,22 @@ void gcode_execute(cmd_block_t cmd_block)
 		/* for G0 or G1, at least X or Y has to be available */
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
 		{
-			target_pos.x = pl_calc_dx(cmd_block.X);
-			is_valid = true;
+			i16val = pl_calc_dx(cmd_block.X);
+			if (i16val != 0)
+			{
+				target_pos.x = i16val;
+				is_valid = true;
+			}
 		}
 
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_Y_BIT))
 		{
-			target_pos.y = pl_calc_dy(cmd_block.Y);
-			is_valid = true;
+			i16val = pl_calc_dy(cmd_block.Y);
+			if (i16val != 0)
+			{
+				target_pos.y = i16val;
+				is_valid = true;
+			}
 		}
 
 		if (true == is_valid)
@@ -317,14 +334,21 @@ void gcode_execute(cmd_block_t cmd_block)
 
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_I_BIT))
 		{
-			center_pos.x = cmd_block.I;
-			is_valid = true;
+			if (cmd_block.I != 0)
+			{
+				center_pos.x = cmd_block.I;
+				is_valid = true;
+			}
+
 		}
 
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_J_BIT))
 		{
-			center_pos.y = cmd_block.J;
-			is_valid = true;
+			if (cmd_block.J != 0)
+			{
+				center_pos.y = cmd_block.J;
+				is_valid = true;
+			}
 		}
 
 		if (true == is_valid)
@@ -332,11 +356,31 @@ void gcode_execute(cmd_block_t cmd_block)
 			pl_arc(target_pos, center_pos, is_ccw);
 		}
 		break;
+	case CMD_G20:
+		/* currently not supported, raise error */
+		break;
+	case CMD_G21:
+		/* this is the only 1 option for now */
+		break;
+	case CMD_G90:
+		pl_set_absolute_coord();
+		break;
+	case CMD_G91:
+		pl_set_relative_coord();
+		break;
 	case CMD_M03:
 		fpga_wr_single_cmd(FPGA_CMD_PEN_UP);
 		break;
 	case CMD_M05:
 		fpga_wr_single_cmd(FPGA_CMD_PEN_DOWN);
+		break;
+	case CMD_M17:
+		fpga_enable();
+		pl_enable();
+		break;
+	case CMD_M18:
+		fpga_disable();
+		pl_disable();
 		break;
 	default:
 		break;

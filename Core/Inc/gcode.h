@@ -29,16 +29,16 @@ typedef enum
 	CMD_G1,
 	CMD_G2,
 	CMD_G3,
+	CMD_G20,
+	CMD_G21,
+	CMD_G90,
+	CMD_G91,
 	CMD_M03,
 	CMD_M05,
+	CMD_M17,
+	CMD_M18,
 	CMD_INVALID
 }gcode_cmd_en;
-
-typedef enum
-{
-	STATE_IDLE,
-	STATE_EXECUTING
-}gcode_state_en;
 
 typedef struct{
     char*      		string;

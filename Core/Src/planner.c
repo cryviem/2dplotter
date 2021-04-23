@@ -9,9 +9,14 @@
 #include "planner.h"
 #include "fpga.h"
 #include "do_math.h"
-
+/* 0 is forward, 1 is backward for both
 const uint16_t ccw_mode_table[4] = {0x010E, 0x030B, 0x020E, 0x000B};
 const uint16_t cw_mode_table[4] = {0x020B, 0x000E, 0x010B, 0x030E};
+*/
+/* 0 is forward, 1 is backward for x, y reversed */
+const uint16_t ccw_mode_table[4] = {0x030E, 0x010B, 0x000E, 0x020B};
+const uint16_t cw_mode_table[4] = {0x000B, 0x020E, 0x030B, 0x010E};
+
 pl_data_t	pl_box = {0};
 
 static void speed_planner(uint32_t fstart, uint32_t fmax, uint32_t fend, uint32_t acc, uint32_t d_total, uint16_t* fcruise, uint16_t* d_dec_from);
@@ -25,12 +30,34 @@ void pl_init(void)
 	pl_box.feedrate = PLANNER_DEFAULT_FEEDRATE;
 	pl_box.accel = PLANNER_DEFAULT_ACCELERATE;
 	pl_box.pos_ref = ABSOLUTE_POSITIONING;
+	pl_box.state = PL_INVALID;
+}
+
+void pl_enable(void)
+{
+	pl_box.cur_pos.x = 0;
+	pl_box.cur_pos.y = 0;
 	pl_box.state = PL_READY;
+}
+
+void pl_disable(void)
+{
+	pl_box.state = PL_INVALID;
 }
 
 bool pl_is_absolute_coord(void)
 {
 	return (ABSOLUTE_POSITIONING == pl_box.pos_ref);
+}
+
+void pl_set_absolute_coord(void)
+{
+	pl_box.pos_ref = ABSOLUTE_POSITIONING;
+}
+
+void pl_set_relative_coord(void)
+{
+	pl_box.pos_ref = RELATIVE_POSITIONING;
 }
 
 void pl_updatespeed(uint16_t spd)
@@ -66,6 +93,7 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 	}
 	else
 	{
+		pblock->mode |= X_DIR_FORWARD;
 		u16val1 = (uint16_t)tar_pos.x;
 	}
 
@@ -76,6 +104,7 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 	}
 	else
 	{
+		pblock->mode |= Y_DIR_FORWARD;
 		u16val2 = (uint16_t)tar_pos.y;
 	}
 
