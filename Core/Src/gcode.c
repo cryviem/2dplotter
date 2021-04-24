@@ -22,19 +22,23 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"G1",			CMD_G1},
 		{"G2",			CMD_G2},
 		{"G3",			CMD_G3},
-		{"G4",			CMD_G4}
+		{"G20",			CMD_G20},
+		{"G21",			CMD_G21},
+		{"G90",			CMD_G90},
+		{"G91",			CMD_G91},
+		{"M03",			CMD_M03},
+		{"M05",			CMD_M05},
+		{"M17",			CMD_M17},
+		{"M18",			CMD_M18},
 };
-const float decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1, 0.1, 0.01, 0.001, 0.0001};
+const float decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1.0, 10.0, 100.0, 1000.0, 10000.0};
 
 gcode_buffer_t gcode_buff = {0};
-cmd_block_t cmd_box = {0};
-gcode_state_en gcode_state = STATE_IDLE;
-
 
 
 static uint8_t split_line(char** list, uint8_t max, char* line, const char *delimeter);
 static gcode_cmd_en search_cmd(char * str);
-static int8_t param_extract(char* letter, float* fval, char* str);
+static int8_t param_extract(char* letter, float* pfval, char* str);
 
 
 
@@ -74,12 +78,12 @@ static gcode_cmd_en search_cmd(char * str)
 }
 
 /* extract letter and float values from string */
-static int8_t param_extract(char* letter, float* fval, char* str)
+static int8_t param_extract(char* letter, float* pfval, char* str)
 {
 	uint16_t pointer = 0;
-	int8_t	sign_value = 1;
+	bool is_neg = false;
+	bool is_decimal = false;
 	uint8_t decimal_cnt = 0;
-	uint8_t is_decimal = 0;
 	uint8_t num;
 	char ch;
 	uint32_t lu32val = 0;
@@ -100,7 +104,7 @@ static int8_t param_extract(char* letter, float* fval, char* str)
 	ch = str[pointer];
 	if (ch == '-')
 	{
-		sign_value = -1;
+		is_neg = true;
 		pointer++;
 	}
 	else if (ch == '+')
@@ -119,7 +123,7 @@ static int8_t param_extract(char* letter, float* fval, char* str)
 			num = ch - '0';
 			lu32val = (((lu32val << 2) + lu32val) << 1) + num;	//lu32val*10 + num
 
-			if (is_decimal == 1)
+			if (is_decimal)
 				decimal_cnt++;
 
 			if (decimal_cnt >= DECIMAL_DIGIT_LIMIT)
@@ -128,7 +132,7 @@ static int8_t param_extract(char* letter, float* fval, char* str)
 		else if (ch == '.')
 		{
 			/* decimal point */
-			is_decimal = 1;
+			is_decimal = true;
 		}
 		else
 		{
@@ -137,11 +141,15 @@ static int8_t param_extract(char* letter, float* fval, char* str)
 		}
 	}
 
+	/* apply decimal */
 	lfval = lu32val;
-	/* decimal apply */
-	lfval *= decimal_factor[decimal_cnt];
-	/* sign apply */
-	*fval = sign_value*lfval;
+	lfval /= decimal_factor[decimal_cnt];
+	/* apply sign */
+	if (is_neg)
+	{
+		lfval = -lfval;
+	}
+	*pfval = lfval;
 	return 0;
 }
 
@@ -200,13 +208,12 @@ int8_t gcode_parser(char *line, cmd_block_t* cmd_block)
     		break;
 
     	case 'F':
-    		cmd_block->F = fval;
-    		cmd_block->flag |= CMD_STATUS_F_BIT;
+        	cmd_block->F = fval;
+        	cmd_block->flag |= CMD_STATUS_F_BIT;
     		break;
 
-    	case 'P':
-    		cmd_block->P = fval;
-    		cmd_block->flag |= CMD_STATUS_P_BIT;
+    	default:
+    		/* don't care */
     		break;
     	}
     }
@@ -226,7 +233,7 @@ bool gcode_receive(void)
 
 void gcode_send_ok(void)
 {
-	HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 3);
+	HAL_UART_Transmit_DMA(&huart1, (uint8_t*)ack_resp, 2);
 }
 
 void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)
@@ -239,8 +246,13 @@ void gcode_rcv_event_cb(UART_HandleTypeDef *huart, uint16_t Pos)
 
 void gcode_wr_buff_cmplt(void)
 {
-	/* add '\0' to make a complete string */
-	gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize] = 0;
+	/* refine input string before parsing:
+	 * 	remove \n character, add \0 to the end */
+	if (gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize - 1] == '\n')
+		gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize - 1] = 0;
+	else
+		gcode_buff.item[gcode_buff.wptr].data[gcode_buff.item[gcode_buff.wptr].actsize] = 0;
+
 	gcode_buff.load_cnt++;
 	gcode_buff.wptr = (gcode_buff.wptr + 1) % GCODE_MAX_BUFF_ITEM;
 }
@@ -266,16 +278,17 @@ uint8_t gcode_get_loaded(void)
 
 void gcode_execute(cmd_block_t cmd_block)
 {
-	pos_t target_pos = {0, 0};
-	pos_t center_pos = {0, 0};
+	pos_t target_pos = {0.0, 0.0};
+	pos_t center_pos = {0.0, 0.0};
+	float  fval;
 	bool is_rapid = false;
 	bool is_ccw = false;
 	bool is_valid = false;
 
-	/* feedrate update */
+	/* feed rate update */
 	if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_F_BIT))
 	{
-		pl_updspdmmpm(cmd_block.F);
+		pl_updatespeed(cmd_block.F);
 	}
 
 	switch (cmd_block.cmdid)
@@ -283,6 +296,7 @@ void gcode_execute(cmd_block_t cmd_block)
 	case CMD_G0:
 		is_rapid = true;
 	case CMD_G1:
+		/* for G0 or G1, at least X or Y has to be available */
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
 		{
 			target_pos.x = pl_calc_dx(cmd_block.X);
@@ -304,26 +318,78 @@ void gcode_execute(cmd_block_t cmd_block)
 	case CMD_G3:
 		is_ccw = true;
 	case CMD_G2:
+		/* for G2 or G3, at least I or J has to be available */
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_I_BIT))
+		{
+			if (cmd_block.I != 0)
+			{
+				center_pos.x = cmd_block.I;
+				is_valid = true;
+			}
+
+		}
+
+		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_J_BIT))
+		{
+			if (cmd_block.J != 0)
+			{
+				center_pos.y = cmd_block.J;
+				is_valid = true;
+			}
+		}
+
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
 		{
-			target_pos.x = pl_calc_dx(cmd_block.X);
-			is_valid = true;
+			fval = pl_calc_dx(cmd_block.X);
+			if(fval > PL_ZERO_THRESHOLD)
+			{
+				target_pos.x = fval;
+			}
+
 		}
 
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_Y_BIT))
 		{
-			target_pos.y = pl_calc_dy(cmd_block.Y);
-			is_valid = true;
+			fval = pl_calc_dy(cmd_block.Y);
+			if(fval > PL_ZERO_THRESHOLD)
+			{
+				target_pos.y = fval;
+			}
 		}
 
-		if ((true == is_valid) && (IS_FLAG_SET(cmd_block.flag, (CMD_STATUS_I_BIT | CMD_STATUS_J_BIT))))
+		if (true == is_valid)
 		{
-			center_pos.x = cmd_block.I;
-			center_pos.y = cmd_block.J;
 			pl_arc(target_pos, center_pos, is_ccw);
 		}
+		break;
+	case CMD_G20:
+		/* currently not supported, raise error */
+		break;
+	case CMD_G21:
+		/* this is the only 1 option for now */
+		break;
+	case CMD_G90:
+		pl_set_absolute_coord();
+		break;
+	case CMD_G91:
+		pl_set_relative_coord();
+		break;
+	case CMD_M03:
+		fpga_wr_single_cmd(FPGA_CMD_PEN_UP);
+		break;
+	case CMD_M05:
+		fpga_wr_single_cmd(FPGA_CMD_PEN_DOWN);
+		break;
+	case CMD_M17:
+		fpga_enable();
+		pl_enable();
+		break;
+	case CMD_M18:
+		fpga_disable();
+		pl_disable();
 		break;
 	default:
 		break;
 	}
 }
+
