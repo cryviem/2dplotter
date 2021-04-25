@@ -10,6 +10,7 @@
 #include "main.h"
 #include "planner.h"
 #include "plotter.h"
+#include "debug.h"
 
 #define IS_NUMBER(x)					((x >= '0') && (x <= '9'))
 #define DECIMAL_DIGIT_LIMIT				4
@@ -30,8 +31,10 @@ const cmd_lut_t cmd_lut[CMD_INVALID] =
 		{"M05",			CMD_M05},
 		{"M17",			CMD_M17},
 		{"M18",			CMD_M18},
+		{"D0",			CMD_D0},
+		{"D1",			CMD_D1},
 };
-const float decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1.0, 10.0, 100.0, 1000.0, 10000.0};
+const float decimal_factor[(DECIMAL_DIGIT_LIMIT + 1)] = {1.0, 0.1, 0.01, 0.001, 0.0001};
 
 gcode_buffer_t gcode_buff = {0};
 
@@ -143,7 +146,7 @@ static int8_t param_extract(char* letter, float* pfval, char* str)
 
 	/* apply decimal */
 	lfval = lu32val;
-	lfval /= decimal_factor[decimal_cnt];
+	lfval *= decimal_factor[decimal_cnt];
 	/* apply sign */
 	if (is_neg)
 	{
@@ -280,10 +283,10 @@ void gcode_execute(cmd_block_t cmd_block)
 {
 	pos_t target_pos = {0.0, 0.0};
 	pos_t center_pos = {0.0, 0.0};
-	float  fval;
 	bool is_rapid = false;
 	bool is_ccw = false;
 	bool is_valid = false;
+	bool is_full_circle = true;
 
 	/* feed rate update */
 	if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_F_BIT))
@@ -340,26 +343,20 @@ void gcode_execute(cmd_block_t cmd_block)
 
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_X_BIT))
 		{
-			fval = pl_calc_dx(cmd_block.X);
-			if(fval > PL_ZERO_THRESHOLD)
-			{
-				target_pos.x = fval;
-			}
+			target_pos.x = pl_calc_dx(cmd_block.X);
+			is_full_circle = false;
 
 		}
 
 		if (IS_FLAG_SET(cmd_block.flag, CMD_STATUS_Y_BIT))
 		{
-			fval = pl_calc_dy(cmd_block.Y);
-			if(fval > PL_ZERO_THRESHOLD)
-			{
-				target_pos.y = fval;
-			}
+			target_pos.y = pl_calc_dy(cmd_block.Y);
+			is_full_circle = false;
 		}
 
 		if (true == is_valid)
 		{
-			pl_arc(target_pos, center_pos, is_ccw);
+			pl_arc(target_pos, center_pos, is_ccw, is_full_circle);
 		}
 		break;
 	case CMD_G20:
@@ -387,6 +384,12 @@ void gcode_execute(cmd_block_t cmd_block)
 	case CMD_M18:
 		fpga_disable();
 		pl_disable();
+		break;
+	case CMD_D0:
+		dbg_D0();
+		break;
+	case CMD_D1:
+		dbg_D1();
 		break;
 	default:
 		break;

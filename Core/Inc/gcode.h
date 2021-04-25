@@ -35,6 +35,8 @@ typedef enum
 	CMD_M05,
 	CMD_M17,
 	CMD_M18,
+	CMD_D0,
+	CMD_D1,
 	CMD_INVALID
 }gcode_cmd_en;
 

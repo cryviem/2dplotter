@@ -26,8 +26,8 @@ static void build_arc_block(float x0, float y0, double radius, double angle, uin
 
 void pl_init(void)
 {
-	pl_box.cur_pos.x = 0;
-	pl_box.cur_pos.y = 0;
+	pl_box.cur_pos.x = 0.0;
+	pl_box.cur_pos.y = 0.0;
 	pl_box.feedrate = PLANNER_DEFAULT_FEEDRATE;
 	pl_box.accel = PLANNER_DEFAULT_ACCELERATE;
 	pl_box.pos_ref = ABSOLUTE_POSITIONING;
@@ -36,8 +36,8 @@ void pl_init(void)
 
 void pl_enable(void)
 {
-	pl_box.cur_pos.x = 0;
-	pl_box.cur_pos.y = 0;
+	pl_box.cur_pos.x = 0.0;
+	pl_box.cur_pos.y = 0.0;
 	pl_box.state = PL_READY;
 }
 
@@ -63,6 +63,7 @@ void pl_set_relative_coord(void)
 
 void pl_updatespeed(float spd)
 {
+	spd /= 60.0;	/* convert from mm/min to mm/s */
 	if (spd < PLANNER_MIN_FEEDRATE)
 		pl_box.feedrate = PLANNER_MIN_FEEDRATE;
 	else if (spd > PLANNER_MAX_FEEDRATE)
@@ -81,17 +82,17 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 		/* machine is not ready */
 		return;
 
-	/* get slot */
-	pblock = fpga_wr_buff_start_pl();
-	if (NULL == pblock)
-		/* no available block */
-		return;
-
 	/* check distances */
 	fval1 = fabs(tar_pos.x);
 	fval2 = fabs(tar_pos.y);
 	if ((fval1 < PL_MIN_DISTANCE_TO_GO) && (fval2 < PL_MIN_DISTANCE_TO_GO))
 		/* too small to move */
+		return;
+
+	/* get slot */
+	pblock = fpga_wr_buff_start_pl();
+	if (NULL == pblock)
+		/* no available block */
 		return;
 
 	/* DDA data fill */
@@ -139,10 +140,9 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 	pl_box.cur_pos.y += tar_pos.y;
 }
 
-void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
+void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw, bool is_circle)
 {
 
-	bool is_full_circle = false;
 	float x0, y0, x1, y1;
 	uint8_t quadrant0, quadrant1, currennt_quad;
 	double radius, angle0, angle1, delta_rad;
@@ -164,9 +164,8 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 	 * r = sqrt(x^2 + y^2) */
 	radius = hypot(x0, y0);
 
-	if ((tar_pos.x < PL_ZERO_THRESHOLD) && (tar_pos.y < PL_ZERO_THRESHOLD))
+	if (is_circle)
 	{
-		is_full_circle = true;
 		x1 = x0;
 		y1 = y0;
 		quadrant1 = quadrant0;
@@ -177,13 +176,13 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 		x1 = tar_pos.x - center.x;
 		y1 = tar_pos.y - center.y;
 		quadrant1 = find_quadrant(x1, y1);
-		angle1 = atan2((double)y1, (double)x1);
+		angle1 = atan2(y1, x1);
 		if (angle1 < 0) angle1 += M_TWOPI;
 	}
 
 	if (true == is_ccw)
 	{
-		if ((false == is_full_circle) && (quadrant0 == quadrant1) && ((angle1 - angle0) > 0))
+		if ((false == is_circle) && (quadrant0 == quadrant1) && ((angle1 - angle0) > 0))
 		{
 			/* 1 block */
 			delta_rad = angle1 - angle0;
@@ -288,7 +287,7 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw)
 	}
 	else
 	{
-		if ((false == is_full_circle) && (quadrant0 == quadrant1) && ((angle0 - angle1) > 0))
+		if ((false == is_circle) && (quadrant0 == quadrant1) && ((angle0 - angle1) > 0))
 		{
 			/* 1 block */
 			delta_rad = angle0 - angle1;
@@ -423,7 +422,12 @@ static uint8_t find_quadrant(float x, float y)
 static void build_arc_block(float x0, float y0, double radius, double angle, uint16_t mode)
 {
 	pl_block_t* pblock = NULL;
-	float fval1, fval2, fdistance;
+	float fval1, fval2;
+	double fdistance;
+
+	fdistance = (float)(radius * angle);
+	if (fdistance < PL_ZERO_THRESHOLD)
+		return;
 	/* get slot */
 	pblock = fpga_wr_buff_start_pl();
 	if (NULL == pblock)
@@ -431,7 +435,6 @@ static void build_arc_block(float x0, float y0, double radius, double angle, uin
 
 	/* DDA data fill */
 	pblock->mode = mode;
-	fdistance = (float)(radius * angle);
 	pblock->Stotal = (uint16_t)(fdistance * PL_MM_TO_PULSE);
 
 	fval1 = fabs(x0);

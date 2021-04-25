@@ -72,5 +72,5 @@ void pl_updatespeed(float spd);
 float pl_calc_dx(float x);
 float pl_calc_dy(float y);
 void pl_line(pos_t tar_pos, bool is_rapid_move);
-void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw);
+void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw, bool is_circle);
 #endif /* PLANNER_H */
