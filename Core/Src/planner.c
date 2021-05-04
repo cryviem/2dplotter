@@ -104,7 +104,7 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 	else{
 		pblock->mode |= X_DIR_FORWARD;
 	}
-	pblock->Px = (uint16_t)(fval1 * PL_MM_TO_PULSE);
+	pblock->Px = (uint16_t)PL_CONVERT_TO_PULSE(fval1);
 
 	if (tar_pos.y < 0){
 		pblock->mode |= Y_DIR_BACKWARD;
@@ -112,10 +112,10 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 	else{
 		pblock->mode |= Y_DIR_FORWARD;
 	}
-	pblock->Py = (uint16_t)(fval2 * PL_MM_TO_PULSE);
+	pblock->Py = (uint16_t)PL_CONVERT_TO_PULSE(fval2);
 
 	hypotval = hypot(fval1, fval2);
-	pblock->Q = (uint16_t)(hypotval * PL_MM_TO_PULSE);
+	pblock->Q = (uint16_t)PL_CONVERT_TO_PULSE(hypotval);
 	pblock->Stotal = pblock->Q;
 
 	/* speed planner calculation */
@@ -125,11 +125,11 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 
 	speed_planner(PLANNER_MIN_FEEDRATE, pl_box.feedrate, PLANNER_MIN_FEEDRATE, pl_box.accel, hypotval, &fval1, &fval2);
 
-	pblock->Fstart =(uint16_t) (PLANNER_MIN_FEEDRATE * PL_MM_TO_PULSE);
-	pblock->Fend = (uint16_t) (PLANNER_MIN_FEEDRATE * PL_MM_TO_PULSE);
-	pblock->Fcruise = (uint16_t) (fval1 * PL_MM_TO_PULSE);
-	pblock->Sdec = (uint16_t) (fval2 * PL_MM_TO_PULSE);
-	pblock->Acc = (uint16_t)ACC_TO_N_FACTOR((pl_box.accel*PL_MM_TO_PULSE));
+	pblock->Fstart =(uint16_t)PL_CONVERT_TO_PULSE(PLANNER_MIN_FEEDRATE);
+	pblock->Fend = (uint16_t)PL_CONVERT_TO_PULSE(PLANNER_MIN_FEEDRATE);
+	pblock->Fcruise = (uint16_t)PL_CONVERT_TO_PULSE(fval1);
+	pblock->Sdec = (uint16_t)PL_CONVERT_TO_PULSE(fval2);
+	pblock->Acc = (uint16_t)ACC_TO_N_FACTOR(PL_CONVERT_TO_PULSE(pl_box.accel));
 	pblock->cmd = FPGA_CMD_PLOTTER_MOVE;
 
 	/* confirm data ready in buffer */
@@ -435,7 +435,7 @@ static void build_arc_block(float x0, float y0, double radius, double angle, uin
 
 	/* DDA data fill */
 	pblock->mode = mode;
-	pblock->Stotal = (uint16_t)(fdistance * PL_MM_TO_PULSE);
+	pblock->Stotal = (uint16_t)PL_CONVERT_TO_PULSE(fdistance);
 
 	fval1 = fabs(x0);
 	fval2 = fabs(y0);
@@ -448,9 +448,9 @@ static void build_arc_block(float x0, float y0, double radius, double angle, uin
 		radius = PL_MAX_FLOAT_TO_U16;
 	}
 
-	pblock->Px = (uint16_t)(fval2 * PL_MM_TO_PULSE);
-	pblock->Py = (uint16_t)(fval1 * PL_MM_TO_PULSE);
-	pblock->Q = (uint16_t)(radius * PL_MM_TO_PULSE);
+	pblock->Px = (uint16_t)PL_CONVERT_TO_PULSE(fval2);
+	pblock->Py = (uint16_t)PL_CONVERT_TO_PULSE(fval1);
+	pblock->Q = (uint16_t)PL_CONVERT_TO_PULSE(radius);
 
 	/* speed planner calculation */
 	/* this version use simple speed planner without overlap and look ahead algorithms,
@@ -459,11 +459,11 @@ static void build_arc_block(float x0, float y0, double radius, double angle, uin
 
 	speed_planner(PLANNER_MIN_FEEDRATE, pl_box.feedrate, PLANNER_MIN_FEEDRATE, pl_box.accel, fdistance, &fval1, &fval2);
 
-	pblock->Fstart =(uint16_t)(PLANNER_MIN_FEEDRATE * PL_MM_TO_PULSE);
-	pblock->Fend = (uint16_t)(PLANNER_MIN_FEEDRATE * PL_MM_TO_PULSE);
-	pblock->Fcruise = (uint16_t)(fval1 * PL_MM_TO_PULSE);
-	pblock->Sdec = (uint16_t)(fval2 * PL_MM_TO_PULSE);
-	pblock->Acc = (uint16_t)ACC_TO_N_FACTOR((pl_box.accel*PL_MM_TO_PULSE));
+	pblock->Fstart =(uint16_t)PL_CONVERT_TO_PULSE(PLANNER_MIN_FEEDRATE);
+	pblock->Fend = (uint16_t)PL_CONVERT_TO_PULSE(PLANNER_MIN_FEEDRATE);
+	pblock->Fcruise = (uint16_t)PL_CONVERT_TO_PULSE(fval1);
+	pblock->Sdec = (uint16_t)PL_CONVERT_TO_PULSE(fval2);
+	pblock->Acc = (uint16_t)ACC_TO_N_FACTOR(PL_CONVERT_TO_PULSE(pl_box.accel));
 	pblock->cmd = FPGA_CMD_PLOTTER_MOVE;
 
 	/* confirm data ready in buffer */

@@ -11,9 +11,11 @@
 #define PL_ZERO_THRESHOLD							0.0125f
 #define PL_MM_TO_PULSE								80.0f	/* pulse/mm */
 #define PL_MAX_FLOAT_TO_U16							819.1875f /* 65535 / PL_MM_TO_PULSE */
-#define PL_MIN_DISTANCE_TO_GO						0.05f	/* mm */
+#define PL_MIN_DISTANCE_TO_GO						0.0125f	/* mm */
 #define PLANNER_MIN_FEEDRATE						5.0f	/* mm/s */
 #define PLANNER_MAX_FEEDRATE						60.0f	/* mm/s */
+
+#define PL_CONVERT_TO_PULSE(x)						lround(x * PL_MM_TO_PULSE)
 /* PLANNER DEFAULT PARAMETERS */
 #define PLANNER_DEFAULT_FEEDRATE					20.0f	/* mm/s */
 #define PLANNER_DEFAULT_ACCELERATE					800.0f	/* mm/s2 */
