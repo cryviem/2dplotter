@@ -6,10 +6,10 @@
  */
 #include "app_common.h"
 #include <string.h>
-#include "main.h"
 #include "planner.h"
 #include "gcode.h"
 #include "plotter.h"
+#include "debug.h"
 
 static bool precond_check(void);
 static void plotter_work(void);
@@ -96,7 +96,10 @@ static void plotter_work(void)
 		line = gcode_rd_buff();
 		memset(&cmd_block, 0, sizeof(cmd_block_t));
 		if (0 != gcode_parser((char*)line, &cmd_block))
+		{
+			error_report(DB_GCODE_DROPPED);
 			continue;	/* ignore the below if cmd parse fail */
+		}
 
 		gcode_execute(cmd_block);
 	}

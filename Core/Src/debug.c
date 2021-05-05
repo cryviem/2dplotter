@@ -6,7 +6,13 @@
  */
 #include "app_common.h"
 #include "fpga.h"
+#include "planner.h"
+#include "debug.h"
 
+char err_str[10] = "error: 00";
+#define DIGIT1					7
+#define DIGIT0					8
+#define NUMBER_OFFSET			30
 void dbg_D0(void)
 {
 	pl_block_t* pblock = NULL;
@@ -59,4 +65,23 @@ void dbg_D1(void)
 	fpga_wr_buff_cmplt();
 }
 
+void error_report(db_errorcode_en err)
+{
+	uint8_t tmp1, tmp2;
+
+	if (err < DB_NUMOFERR)
+	{
+		tmp1 = (uint8_t)err;
+		tmp2 = tmp1 % 10;
+		err_str[DIGIT0] = tmp2 + NUMBER_OFFSET;
+		tmp1 /= 10;
+		tmp2 = tmp1 % 10;
+		err_str[DIGIT1] = tmp2 + NUMBER_OFFSET;
+
+		HAL_UART_Transmit_DMA(&huart1, (uint8_t*)err_str, 9);
+		pl_disable();
+		fpga_disable();
+		LED_RED_ON();
+	}
+}
 

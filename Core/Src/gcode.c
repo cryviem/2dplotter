@@ -7,7 +7,6 @@
 #include "app_common.h"
 #include <string.h>
 #include "gcode.h"
-#include "main.h"
 #include "planner.h"
 #include "plotter.h"
 #include "debug.h"
@@ -380,6 +379,7 @@ void gcode_execute(cmd_block_t cmd_block)
 	case CMD_M17:
 		fpga_enable();
 		pl_enable();
+		LED_RED_OFF();
 		break;
 	case CMD_M18:
 		fpga_disable();

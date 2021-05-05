@@ -420,6 +420,7 @@ void periodic_task(void *argument)
 			{
 				fpga_enable();
 				pl_enable();
+				LED_RED_OFF();
 				flag = true;
 			}
 			else

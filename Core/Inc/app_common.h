@@ -10,6 +10,7 @@
 
 #include "stm32f4xx_hal.h"
 #include <stdbool.h>
+#include "main.h"
 
 #define LED_GREEN_ON()				HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
 #define LED_GREEN_OFF()				HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_RESET);

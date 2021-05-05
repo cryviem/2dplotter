@@ -9,6 +9,7 @@
 #include "planner.h"
 #include "fpga.h"
 #include "do_math.h"
+#include "debug.h"
 
 /* 0 is forward, 1 is backward for both
 const uint16_t ccw_mode_table[4] = {0x010E, 0x030B, 0x020E, 0x000B};
@@ -79,21 +80,30 @@ void pl_line(pos_t tar_pos, bool is_rapid_move)
 
 	/* check status */
 	if (pl_box.state != PL_READY)
+	{
 		/* machine is not ready */
+		error_report(DB_STATE_NOT_READY);
 		return;
+	}
 
 	/* check distances */
 	fval1 = fabs(tar_pos.x);
 	fval2 = fabs(tar_pos.y);
 	if ((fval1 < PL_MIN_DISTANCE_TO_GO) && (fval2 < PL_MIN_DISTANCE_TO_GO))
+	{
 		/* too small to move */
+		error_report(DB_TOO_SMALL_BLOCK);
 		return;
+	}
 
 	/* get slot */
 	pblock = fpga_wr_buff_start_pl();
 	if (NULL == pblock)
+	{
 		/* no available block */
+		error_report(DB_NO_FPGA_SLOT);
 		return;
+	}
 
 	/* DDA data fill */
 	pblock->mode = 0;
@@ -148,7 +158,10 @@ void pl_arc(pos_t tar_pos, pos_t center, bool is_ccw, bool is_circle)
 	double radius, angle0, angle1, delta_rad;
 
 	if (pl_box.state != PL_READY)
+	{
+		error_report(DB_STATE_NOT_READY);
 		return;
+	}
 
 	/*
 	 * start point S: x0 = -I; y0 = -J
@@ -425,13 +438,20 @@ static void build_arc_block(float x0, float y0, double radius, double angle, uin
 	float fval1, fval2;
 	double fdistance;
 
-	fdistance = (float)(radius * angle);
+	fdistance = radius * angle;
 	if (fdistance < PL_ZERO_THRESHOLD)
+	{
+		error_report(DB_TOO_SMALL_BLOCK);
 		return;
+	}
+
 	/* get slot */
 	pblock = fpga_wr_buff_start_pl();
 	if (NULL == pblock)
+	{
+		error_report(DB_NO_FPGA_SLOT);
 		return;
+	}
 
 	/* DDA data fill */
 	pblock->mode = mode;
